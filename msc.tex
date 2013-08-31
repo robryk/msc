@@ -28,6 +28,8 @@
 \newtheorem{definition}{Definition}
 \newcommand{\code}[1]{\text{#1}}
 \newcommand{\fn}[1]{\textsc{#1}}
+\newcommand{\var}[2]{\textbf{var }#1 : #2}
+\newcommand{\arrayspec}[1]{\text{array}[#1]\text{ of }}
 \usepackage{float}
 \newfloat{Listing}{t}{lop}
 \author{Robert Obryk}
@@ -85,8 +87,8 @@ We will specify its semantics by providing pseudocode which correctly implements
 a single-threaded program (this will be our method of choice of providing object's semantics):
 
 \begin{algorithmic}[1]
-\State \T $x$
-
+\State\var{$x$}{\T}
+	
 \Function{rd}{}
 	\State\Return $x$
 \EndFunction
@@ -167,7 +169,7 @@ example of an implementation of a simple structure.
 Let's consider an increase-only counter: a shared object with the following semantics:
 
 \begin{algorithmic}[1]
-\State \textbf{int} $x$
+\State\var{$x$}{\int}
 
 \Function{inc}{}
 	$x \gets x + 1$
@@ -180,7 +182,7 @@ Let's consider an increase-only counter: a shared object with the following sema
 We will see that the following implementation serializes to this shared object:
 
 \begin{algorithmic}[1]
-\State \textbf{int} $V$ \Comment{A CAS object holding an \textbf{int}}
+\State\var{$V$}{\int} \Comment{A CAS object holding an \int}
 
 \Function{inc}{}
 	\Repeat
@@ -204,12 +206,12 @@ We can also see that this implementation satisfies some global progress property
 another \fn{inc} must have suceeded very recently. In fact, it must have succeeded between the most recent execution
 of xx and the failed CAS. Still, a single \fn{inc} operation can fail to terminate.
 
-\subsection{Wait-freeness}
+\subsection{Wait-freedom}
 
 Consider an alternative implementation of an increment-only counter:
 
 \begin{algorithmic}[1]
-\State \textbf{int} $T[P]$ \Comment{T is an array of $P$ CAS objects of type int}
+	\State\var{$T$}{\arrayspec{P}$\int$} \Comment{T is an array of $P$ CAS objects of type \int}
 \Function{inc$_p$}{}
 	\State $x \gets T[p].\fn{rd}()$
 	\State $T[p].\fn{wr}(x + 1)$
@@ -248,7 +250,7 @@ The object implemented in this paper is a generalization of a popular building b
 object\cite{snapshot-idea}. Its semantics can be defined by following single-threaded pseudocode:
 
 \begin{algorithmic}[1]
-\State \T $T[N]$
+	\State\var{$T$}{\arrayspec{N}$\T$}
 \Function{update$_i$}{$x$}
 	\State $T[i] \gets x$
 \EndFunction
@@ -268,7 +270,7 @@ One can try to improve on this structure in two different ways. First, we can me
 into an operation that does an update and immediately thereafter a scan. This object, which we'll call write-and-snapshot\cite{write-and-snap}, can be defined by the following single-threaded specification:
 
 \begin{algorithmic}[1]
-\State \T $T[N]$
+	\State\var{$T$}{\arrayspec{N}$\T$}
 \Function{update-and-snap$_i$}{$x$}
 	\State $T[i] \gets x$
 	\For{$i \gets 0 \mbox{to} N$}
@@ -282,7 +284,7 @@ For the second improvement, let us note that in many cases, one doesn't need the
 a result of applying an associative operation to all the array's elements (for example, if we need to retrieve the sum of all array's elements). If we call the operator $f$, the following is a specification of an f-array:
 
 \begin{algorithmic}[1]
-\State \T $T[N]$
+	\State\var{$T$}{\arrayspec{N}$\T$}
 \Function{update$_i$}{$x$}
 	\State $T[i] \gets x$
 \EndFunction
@@ -299,7 +301,7 @@ write-and-f-array: that is, one that disallows concurrent modifications to the s
 
 \begin{Listing}
 \begin{algorithmic}[1]
-\State \textbf{int} V
+\State\var{V}{\int}
 \Function{fetch-and-add}{$x$}
 	\State $r \gets V$
 	\State $V \gets V + x$
@@ -324,8 +326,8 @@ of the operation \cite{ellen-fai}\cite{closed-object}. They also need to employ 
 
 \begin{Listing}[!h]
 \begin{algorithmic}[1]
-	\State $\T H[]$
-	\State $\int ver$
+	\State\var{$H$}{\arrayspec{\ldots}$\T$}
+	\State\var{ver}{\int} % fixme formatting
 	\Function{get-current}{}
 		\State \Return $ver$, $H[ver]$
 	\EndFunction
@@ -359,9 +361,9 @@ Our wait-free implementation will impose an additional constraint on its use: ev
 Our implementation is presented below:
 
 \begin{algorithmic}[1]
-	\State $\textbf{pair}\left<\int v, \int p\right> S$ \Comment{Version number and $p$ of the most recently published value}
-	\State $\textbf{pair}\left<\int v, \T T\right> H[N]$ \Comment{A circular buffer of last $N$ values (except maybe the most recent one)}
-	\State $\textbf{pair}\left<\int v, \T T\right> L[P]$ \Comment{Temporary storage for values being published}
+	\State\var{$S$}{$\textbf{pair}\left<\int v, \int p\right>$} \Comment{Version number and $p$ of the most recently published value}
+	\State\var{$H$}{\arrayspec{N}$\textbf{pair}\left<\int v, \T T\right>$} \Comment{A circular buffer of last $N$ values (except maybe the most recent one)}
+	\State\var{$L$}{\arrayspec{P}$\textbf{pair}\left<\int v, \T T\right>$} \Comment{Temporary storage for values being published}
 	\Function{get-current}{}
 		\State $s \gets S$ \Comment{Possible serialization point}
 		\State \fn{help}()
@@ -498,10 +500,10 @@ The concurrent implementation will be restricted by disallowing concurrent calls
 
 \begin{Listing}
 \begin{algorithmic}[1]
-	\State \T $v[N]$
-	\State \textbf{int} $\text{last\_update}[N]$
-	\State \textbf{int} $\text{last\_version}[N]$
-	\State \textbf{T} $\text{last\_val}[N]$
+	\State\var{$v[N]$}{\arrayspec{N}$\T$}
+	\State\var{$\text{last\_update}$}{\arrayspec{N}\int}
+	\State\var{$\text{last\_version}$}{\arrayspec{N}\int}
+	\State\var{$\text{last\_val}$}{\arrayspec{N}\T}
 	
 	\Function{update$_i$}{$T$}
 		\State $r \gets f(v[0], v[1],\ldots, v[N-1])$
@@ -528,7 +530,7 @@ see that it is indeed correct and that all operations take constant time.
 
 \begin{Listing}[!h]
 \begin{algorithmic}[1]
-	\State \textbf{pair<int v, \T T>} S
+	\State\var{S}{\textbf{pair<int v, \T T>}}
 	\Function{write-and-f$_0$}{T'}
 		\State v, T $\gets$ S
 		\State S $\gets$ (v + 1, T')
@@ -550,17 +552,17 @@ see that it is indeed correct and that all operations take constant time.
 The implementation for $N > 1$ is presented below (interspersed with comments):
 \begin{algorithmic}[1]
 	\Struct{node-value}
-		\State \T $T[2]$ \Comment{Child values}
-		\State \textbf{int} $v[2]$ \Comment{Child versions}
+		\State \var{$T$}{\arrayspec{2}\T} \Comment{Child values}
+		\State \var{$v$}{\arrayspec{2}\int} \Comment{Child versions}
 	\EndStruct
 	\Struct{last-value}
-		\State \textbf{int} $n$
-		\State \textbf{int} $v$
-		\State \T $T$
+		\State \var{$n$}{\int}
+		\State \var{$v$}{\int}
+		\State \var{$T$}{\T}
 	\EndStruct
-	\State \textsc{write-and-f-array} $C[2]$ \Comment{of size resp. $\lceil{}N/2\rceil{}$ and $\lfloor{}N/2\rfloor{}$}
-	\State \textbf{history object<node-value>} $H$ \Comment{of size $N+1$, for $N$ concurrent updates}
-	\State \textbf{last-value} $L[N]$ %\Comment{thread's update count, version, value from before update}
+	\State \var{$C$}{\arrayspec{2}\textsc{write-and-f-array}}  \Comment{of size resp. $\lceil{}N/2\rceil{}$ and $\lfloor{}N/2\rfloor{}$}
+	\State \var{$H$}{\textbf{history object<node-value>}} \Comment{of size $N+1$, for $N$ concurrent updates}
+	\State \var{$L$}{\arrayspec{N}\textbf{last-value}} %\Comment{thread's update count, version, value from before update}
 	\algstore{impl}
 \end{algorithmic}
 
