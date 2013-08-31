@@ -219,7 +219,7 @@ Consider an alternative implementation of an increment-only counter:
 \Function{read}{}
 	\State $R \gets 0$
 	\For{$i \gets 1 \mbox{to} P$}
-		\State $R \gets R + T[i]$
+	\State $R \gets R + T[i].\fn{rd}$
 	\EndFor
 	\State\Return $R$
 \EndFunction
@@ -367,25 +367,25 @@ Our implementation is presented below:
 	\State\var{$H$}{\arrayspec{N}$\textbf{pair}\left<\int v, \T T\right>$} \Comment{A circular buffer of last $N$ values (except maybe the most recent one)}
 	\State\var{$L$}{\arrayspec{P}$\textbf{pair}\left<\int v, \T T\right>$} \Comment{Temporary storage for values being published}
 	\Function{get-current}{}
-		\State $s \gets S$ \Comment{Possible serialization point}
+		\State $s \gets S.\fn{rd}$ \Comment{Possible serialization point}
 		\State \fn{help}()
-		\State \Return $H[s.v \mod N]$
+		\State \Return $H[s.v \mod N].\fn{rd}$
 	\EndFunction
 	\Function{help}{}
-		\State $s \gets S$
-		\State $l \gets L[s.p]$
-		\State $h \gets H[s.v \mod N]$
+		\State $s \gets S.\fn{rd}$
+		\State $l \gets L[s.p].\fn{rd}$
+		\State $h \gets H[s.v \mod N].\fn{rd}$
 		\If{$l.v = s.v \textbf{and} h.v < s.v$}
-		\State $\text{CAS}(H[s.v \mod N], h, l)$ \label{hist-help-cas}
+		\State $H[s.v \mod N].\fn{CAS}(h, l)$ \label{hist-help-cas}
 		\EndIf
 	\EndFunction
 	\Function{get}{v}
-		\State $s \gets S$ \label{hist-get-notyet-sp} \Comment{Possible serialization point}
+	\State $s \gets S.\fn{rd}$ \label{hist-get-notyet-sp} \Comment{Possible serialization point}
 		\If{$s.v < v$}
 		\State \Return \none \label{hist-get-notyet} \Comment{The requested version hasn't been published yet}
 		\EndIf
 		\State \fn{help}()
-		\State $h \gets H[v \mod N]$
+		\State $h \gets H[v \mod N].\fn{rd}$
 		\If{$h.v = v$}
 			\State \Return $h.T$
 		\Else
@@ -393,13 +393,13 @@ Our implementation is presented below:
 		\EndIf
 	\EndFunction
 	\Function{publish$_p$}{v, T}
-		\State $s \gets S$ \label{hist-pub-earlier-sp} \Comment{Possible serialization point}
+		\State $s \gets S.\fn{rd}$ \label{hist-pub-earlier-sp} \Comment{Possible serialization point}
 		\If{$v \neq s.v + 1$}
 			\State \Return \textbf{false} \label{hist-pub-earlier-exit}
 		\EndIf
 		\State \fn{help}()
-		\State $L[p] \gets (v, T)$ \label{hist-pub-latest}
-		\If{$\text{CAS}(S, s, (v, p)$) \textbf{failed}} \Comment{Possible serialization point}\label{hist-pub-later-sp}
+		\State $L[p].\fn{wr}((v, T))$ \label{hist-pub-latest}
+		\If{$S.\fn{CAS}(s, (v, p)$) \textbf{failed}} \Comment{Possible serialization point}\label{hist-pub-later-sp}
 			\State \Return \textbf{false}
 		\EndIf
 		\State \Return \textbf{true}
@@ -532,18 +532,18 @@ see that it is indeed correct and that all operations take constant time.
 
 \begin{Listing}[!h]
 \begin{algorithmic}[1]
-	\State\var{S}{\textbf{pair<int v, \T T>}}
+	\State\var{S}{\textbf{pair<int v, \T T>}} %TODO: local var name T is misleading. rename?
 	\Function{write-and-f$_0$}{T'}
-		\State v, T $\gets$ S
-		\State S $\gets$ (v + 1, T')
-		\State \Return v + 1, v + 1, T
+		\State $v, T \gets S.\fn{rd}$
+		\State $S.\fn{wr}((v + 1, T'))$
+		\State \Return $v + 1, v + 1, T$
 	\EndFunction
 	\Function{get-last}{$i$}
-		\State v, T $\gets$ S
-		\State \Return v, v, T
+		\State $v, T \gets S.\fn{rd}$
+		\State \Return $v, v, T$
 	\EndFunction
 	\Function{read}{}
-		\State \Return S
+		\State \Return $S.\fn{rd}$
 	\EndFunction
 \end{algorithmic}
 \caption{The enriched write-and-f-array snapshot implementation for $N=1$}
@@ -620,14 +620,14 @@ We will show that it suffices to attempt to call \fn{update} twice to accomplish
 		\Else
 		\State $T \gets f(h_{new}.T[0], l_c.T)$
 		\EndIf
-		\State $l \gets L[x]$
+		\State $l \gets L[x].\fn{rd}$
 		\If{$l.n < l_C.n$} \label{upd-last-alreadydone}
-			\State $\text{CAS}(L[x], l, (l_C.n, v, T))$
+			\State $L[x].\text{CAS}(l, (l_C.n, v, T))$
 		\EndIf
 	\EndFunction
 	\Function{get-last}{x}
 		\State $\fn{help}(x)$
-		\State \Return $L[x]$
+		\State \Return $L[x].\fn{rd}$
 	\EndFunction
 \end{algorithmic}
 
