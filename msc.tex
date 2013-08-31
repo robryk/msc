@@ -231,7 +231,7 @@ Obviously, we need to choose the call to WRITE as the serialization point of \fn
 of entries of T we can infer that \fn{read} returns a value between (inclusive) the number of calls to \fn{inc} that have
 serialized before \fn{read} has started and finished. Thus if a call to \fn{read} returns x, there is a point during its
 execution when exactly x \fn{inc}s had been serialized. We can choose this point to be the serialization point of
-\fn{read}\footnote{Note that it need not correspond to an action executed by the implementation of \fn{read}}.
+\fn{read}. Note that it need not correspond to an action executed by the implementation of \fn{read}.
 
 We can see that this implementation satisfies a very strong termination condition -- the number of steps every
 procedure takes is bounded and the bound depends only on the number of threads (and not on the properties of
@@ -299,7 +299,9 @@ being linear in $N$.
 This paper introduces a write-and-f-array: an object that combines these two modifications. Its semantics are defined by the single-threaded specification in Listing~\ref{spec-general}. We then provide implementation of a single-writer
 write-and-f-array: that is, one that disallows concurrent modifications to the same array element.
 
-\begin{Listing}
+We then use this object to implement a fetch-and-add object. Fetch-and-add is a generalization of the increment-only counter we've seen. Its semantics are specified by the listing below:
+
+%\begin{Listing}
 \begin{algorithmic}[1]
 \State\var{V}{\int}
 \Function{fetch-and-add}{$x$}
@@ -308,11 +310,11 @@ write-and-f-array: that is, one that disallows concurrent modifications to the s
 	\State\Return $r$
 \EndFunction
 \end{algorithmic}
-\caption{Specification of semantics of fetch-and-add}
-\label{faa-spec}
-\end{Listing}
+%\caption{Specification of semantics of fetch-and-add}
+%\label{faa-spec}
+%\end{Listing}
 
-We then use this object to implement a fetch-and-add object. Fetch-and-add is a generalization of the increment-only counter we've seen. Its semantics are specified in Listing~\ref{faa-spec}.
+
 Fetch-and-add objects can be used to produce unique identifiers, implement
 mutual exclusion, barrier synchronization\cite{faa-sync}, or work queues\cite{faa-queue}. Its known wait-free shared memory implementations for $P$ processes have $\Omega(P^2)$ memory complexity and $O(\log^2 P)$ step complexity
 of the operation \cite{ellen-fai}\cite{closed-object}. They also need to employ complicated memory management techniques to bound their memory use. Our implementation reduces the memory complexity to $O(P\log P)$ while maintaining polylogarithmic step complexity.
