@@ -64,7 +64,7 @@ distinct code) that can only communicate by calling methods on some objects. We 
 the speed of execution and delays of threads -- they may wait arbitrarily long before a method call.
 We also assume that method calls on the objects complete instaneously and that no two of them happen at the same time.
 This allows us to define semantics of the objects in the same fashion we define them in the single-threaded case:
-method of every object are invoked in a known order, so single-threaded semantics suffice to determine object's behaviour\footnote{The whole program may still be nondeterministic, due to scheduling vagaries.}.
+method of every object are invoked in a known order, so single-threaded semantics suffice to determine object's behaviour\footnote{The whole program may still be nondeterministic, due to nondeterministic scheduling.}.
 We will call such objects concurrent objects to emphasize that they may be accessed concurrently.
 
 %An asynchronous shared memory system consists of a number of threads and a number of shared objects. Each
@@ -82,7 +82,7 @@ We will call such objects concurrent objects to emphasize that they may be acces
 %periods of time, or execute many actions without interruption; they may even be ,,hung'' forever (we will call
 %such threads stopped).
 
-An object we will predominantly use in this paper is a CAS\footnote{Compare-And-Swap} register.
+An object we will predominantly use in this paper is a CAS (Compare-And-Swap) register.
 We will specify its semantics by providing pseudocode which correctly implements this object in
 a single-threaded program (this will be our method of choice of providing object's semantics):
 
@@ -108,7 +108,8 @@ a single-threaded program (this will be our method of choice of providing object
 \end{algorithmic}
 
 Intuitively, such a register holds a value that can be read (by \fn{rd}), modified unconditionally (by \fn{wr})
-and modified conditionally (by \fn{CAS}). It's interesting due to its universality properties and because it's
+and modified conditionally (by \fn{CAS}). It's interesting due to its universality properties % TODO: cite universality
+and because it's
 commonly seen in real-world hardware. % T?
 
 \begin{example}
@@ -133,11 +134,13 @@ at least one of the \fn{rd}() calls returns 1.
 \subsection{Serialization}
 In many situations it would be convenient to have more complicated concurrent objects: counters that can be incremented,
 queues that can be pushed to and popped from, etc. Alas, real-world hardware usually doesn't implement such objects
-directly. We will thus implement them using CAS registers or other simpler objects: we will substitute a set of simpler objects for every such object and for every method call on this objects, execute a procedure that implements it instead. Obviously, we will want such substitution to preserve semantics of the program in which it was substituted. The following condition immediately implies this
-\footnote{For a detailed discussion of subtleties related to this definition, refer to chapter 3.3-3.6 of TheArt}:
+directly. We will thus implement them using CAS registers or other simpler objects: we will substitute a set of simpler objects for every such object and for every method call on this object, execute a procedure that implements it instead.
+However, these prodecures might run concurrently, so we can't blindly use a single-threaded implementation of the object.
+Obviously, we will want such substitution to preserve semantics of the program in which it was substituted. The following condition immediately implies
+this\footnote{For a detailed discussion of subtleties related to this definition, refer to chapter 3.3-3.6 of TheArt}:
 
 \begin{definition}
-An implementation of a concurrent object \emph{serializes}, if for every execution of a program with the implementation
+An implementation of a concurrent object \emph{serializes} iff for every execution of a program with the implementation
 substituted for the object:
 
 For every call to object's method that completes, we can define a \emph{serialization point} in its execution
@@ -172,7 +175,7 @@ Let's consider an increase-only counter: a shared object with the following sema
 \State\var{$x$}{\int}
 
 \Function{inc}{}
-	$x \gets x + 1$
+	\State$x \gets x + 1$
 \EndFunction
 \Function{read}{}
 	\State\Return$x$
@@ -186,8 +189,8 @@ We will see that the following implementation serializes to this shared object:
 
 \Function{inc}{}
 	\Repeat
-		$o \gets V.\fn{rd}()$
-		\Until{$V.\fn{CAS}(o, o+1)$}
+	\State$o \gets V.\fn{rd}()$ \label{trivial-faa-rd}
+	\Until{$V.\fn{CAS}(o, o+1)$}
 \EndFunction
 
 \Function{read}{}
@@ -195,20 +198,21 @@ We will see that the following implementation serializes to this shared object:
 \EndFunction
 \end{algorithmic}
 
-Note that every call to \fn{inc} executes exactly one successful call to V.CAS. Let us claim that the serialization
-point of \fn{inc} is that successful call to CAS and the serialization point of \fn{read} is the call to
-V.READ. We can easily see that the number returned by READ is exactly the number of \fn{inc}s that serialized
+Note that every call to \fn{inc} executes exactly one successful call to $V.\fn{CAS}$. Let us claim that the serialization
+point of \fn{inc} is that successful call to \fn{CAS} and the serialization point of \fn{read} is the call to
+$V.\fn{rd}$. We can easily see that the number returned by \fn{rd} is exactly the number of \fn{inc}s that serialized
 before that \fn{read}.
 % figure with serialization
 \end{example}
 
 We can also see that this implementation satisfies some global progress property -- when the CAS in \fn{inc} fails,
 another \fn{inc} must have suceeded very recently. In fact, it must have succeeded between the most recent execution
-of xx and the failed CAS. Still, a single \fn{inc} operation can fail to terminate.
+of line~\ref{trivial-faa-rd} and the failed CAS. Still, a single \fn{inc} operation can fail to terminate.
 
 \subsection{Wait-freedom}
 
-Consider an alternative implementation of an increment-only counter:
+Consider an alternative implementation of an increment-only counter. In the following pseudocode, $P$ denotes
+the number of threads in the system.
 
 \begin{algorithmic}[1]
 	\State\var{$T$}{\arrayspec{P}$\int$} \Comment{T is an array of $P$ CAS objects of type \int}
@@ -218,7 +222,7 @@ Consider an alternative implementation of an increment-only counter:
 \EndFunction
 \Function{read}{}
 	\State $R \gets 0$
-	\For{$i \gets 1 \mbox{to} P$}
+	\For{$i \gets 1 \mbox{ to } P$}
 	\State $R \gets R + T[i].\fn{rd}$
 	\EndFor
 	\State\Return $R$
@@ -226,28 +230,30 @@ Consider an alternative implementation of an increment-only counter:
 \end{algorithmic}
 
 Here we differentiate between threads: the index p in \fn{inc} corresponds to the current thread's ID from range
-$\{0, \ldots, P-1\}$. Let's see first that this implementation actually serializes to the increment-only counter.
+$\{0, \ldots, P-1\}$. Let us first see that this implementation actually serializes to the increment-only counter.
 Obviously, we need to choose the call to WRITE as the serialization point of \fn{inc}. From the monotonicity
 of entries of T we can infer that \fn{read} returns a value between (inclusive) the number of calls to \fn{inc} that have
-serialized before \fn{read} has started and finished. Thus if a call to \fn{read} returns x, there is a point during its
+serialized before \fn{read} has started and the number of calls serialized before it has finished.
+Thus if a call to \fn{read} returns x, there is a point during its
 execution when exactly x \fn{inc}s had been serialized. We can choose this point to be the serialization point of
 \fn{read}. Note that it need not correspond to an action executed by the implementation of \fn{read}.
 
 We can see that this implementation satisfies a very strong termination condition -- the number of steps every
-procedure takes is bounded and the bound depends only on the number of threads (and not on the properties of
-a particular execution trace). We will call such implementations \emph{wait-free}. For a discussion of weaker
+procedure takes is bounded and the bound depends only on the number of threads (and not on the behaviour of
+the scheduler). We will call such implementations \emph{wait-free}. For a discussion of weaker
 termination guarantees, see chapter 3.7 of TheArt.
 
 Every object that has a single-threaded specification has a wait-free implementation\ref{universal-wf} using
 only CAS registers.
-However, time complexities of the operations are larger by at least a factor of number of threads. 
+However, this construction yields objects with operation time complexities inflated at least by a factor
+of the number of threads.
 Thus, creating faster wait-free implementations of data structures is interesting, also from a practical
 point of view.
 
 \subsection{Snapshots}
 
-The object implemented in this paper is a generalization of a popular building block -- an atomic snapshot
-object\cite{snapshot-idea}. Its semantics can be defined by following single-threaded pseudocode:
+The object implemented in this paper is a generalization of a popular building block for multithreaded objects
+-- an atomic snapshot object\cite{snapshot-idea}. Its semantics can be defined by following single-threaded pseudocode:
 
 \begin{algorithmic}[1]
 	\State\var{$T$}{\arrayspec{N}$\T$}
@@ -255,7 +261,7 @@ object\cite{snapshot-idea}. Its semantics can be defined by following single-thr
 	\State $T[i] \gets x$
 \EndFunction
 \Function{scan}{}
-	\For{$i \gets 0 \mbox{to} N$}
+	\For{$i \gets 0 \mbox{ to } N$}
 		\State $R[i] \gets T[i]$
 	\EndFor
 	\State\Return $R$
@@ -266,21 +272,25 @@ Intuitively, this object represents an array that can be modified piecewise and 
 There are known wait-free implementations of an $N$-element atomic snapshot with $O(1)$ \fn{update} and $O(N)$ \fn{scan} step complexities\cite{snapshot-impl}. These complexities are obviously
 optimal.
 
-One can try to improve on this structure in two different ways. First, we can merge the update and scan operations
-into an operation that does an update and immediately thereafter a scan. This object, which we'll call write-and-snapshot\cite{write-and-snap}, can be defined by the following single-threaded specification:
+One can try to extend this structure in many ways. Two of them are singularly interesting for us.
+First, we can merge the update and scan operations
+into an operation that does an update and a scan\footnote{Obviously, one can call these operations sequentially
+on a normal snapshot object. However, another update operation could then happen between the update and the scan.
+This cannot happen if the update and scan calls are merged into a single atomic operation.}.
+This object, which we'll call write-and-snapshot\cite{write-and-snap}, can be defined by the following single-threaded specification:
 
 \begin{algorithmic}[1]
 	\State\var{$T$}{\arrayspec{N}$\T$}
-\Function{update-and-snap$_i$}{$x$}
+\Function{update-and-scan$_i$}{$x$}
 	\State $T[i] \gets x$
-	\For{$i \gets 0 \mbox{to} N$}
+	\For{$i \gets 0 \mbox{ to } N$}
 		\State $R[i] \gets T[i]$
 	\EndFor
 	\State\Return $R$
 \EndFunction
 \end{algorithmic}
 
-For the second improvement, let us note that in many cases, one doesn't need the \fn{scan} operation to return the whole array, but rather some sort of its digest. The f-arrays\cite{f-array} allow one to do precisely that for digests that can be expressed as
+For the second extension, let us note that in many cases one doesn't need the \fn{scan} operation to return the whole array, but rather some sort of its digest. The f-arrays\cite{f-array} allow one to do precisely that for digests that can be expressed as
 a result of applying an associative operation to all the array's elements (for example, if we need to retrieve the sum of all array's elements). If we call the operator $f$, the following is a specification of an f-array:
 
 \begin{algorithmic}[1]
@@ -296,8 +306,19 @@ a result of applying an associative operation to all the array's elements (for e
 There is an implementation of f-array with step complexities of \fn{update} and \fn{scan} being respectively $O(\log N)$ and $O(1)$ and the memory complexity
 being linear in $N$.
 
-This paper introduces a write-and-f-array: an object that combines these two modifications. Its semantics are defined by the single-threaded specification in Listing~\ref{spec-general}. We then provide implementation of a single-writer
-write-and-f-array: that is, one that disallows concurrent modifications to the same array element.
+This paper introduces a write-and-f-array: an object that combines these two modifications. Its semantics are defined by the single-threaded specification below:
+
+\begin{algorithmic}[1]
+	\State\var{$T$}{\arrayspec{N}$\T$}
+	\Function{update-and-$f_i$}{$x$}
+		\State $T[i] \gets x$
+		\State\Return $f(T[0], T[1], \ldots, T[N-1])$
+	\EndFunction
+\end{algorithmic}
+
+The main result of this work is an implementation of a single-writer
+write-and-f-array: that is, one that disallows concurrent modifications to the same array element. The implementation
+uses $O(N\lg{}N)$ memory and the step complexity of the operation is $O(\lg^3N)$. 
 
 We then use this object to implement a fetch-and-add object. Fetch-and-add is a generalization of the increment-only counter we've seen. Its semantics are specified by the listing below:
 
@@ -322,78 +343,85 @@ of the operation \cite{ellen-fai}\cite{closed-object}. They also need to employ 
 %In the second section of this paper we construct a helper structure, while in the third section we construct an implementation of the write-and-f-array. In the last section we describe possible extensions of this
 %structure and open problems.
 
-
-
 \section{The History Object}
 
-\begin{Listing}[!h]
+We will first implement a helper object -- the history object. Intuitively, it contains a versioned memory cell and allows retrieval of past $N$ values of the cell. The cell holds objects of type \T. The semantics of this object are precisely specified by the following single-threaded implementation:
+%\begin{Listing}[!h]
 \begin{algorithmic}[1]
+	\filbreak
 	\State\var{$H$}{\arrayspec{\ldots}$\T$}
-	\State\var{ver}{\int} % fixme formatting
+	\State\var{$V$}{\int} \Comment{Current version}% fixme formatting
+	\filbreak
 	\Function{get-current}{}
-		\State \Return $ver$, $H[ver]$
+		\State \Return $V$, $H[V]$
 	\EndFunction
+	\filbreak
 	\Function{get}{$v$}
-		\If{$v \leq ver - N$}
+		\If{$v \leq V - N$}
 			\State \Return \none
 		\Else
-		\State \Return $H[ver]$
+		\State \Return $H[v]$
 		\EndIf
 	\EndFunction
+	\filbreak
 	\Function{publish}{$v$, $T$}
-		\If{$v = ver + 1$}
-		\State $H[v] \gets T$
-			\State $ver \gets v$
+		\If{$v = V + 1$}
+			\State $H[v] \gets T$
+			\State $V \gets v$
 			\State \Return true
 		\Else
 			\State \Return false
 		\EndIf
 	\EndFunction
 \end{algorithmic}
-\caption{Specification of the history object}
-\label{hist-spec}
-\end{Listing}
-We will first implement a helper object -- the history object. Intuitively, it contains a versioned memory cell and allows retrieval of past $N$ values of the cell. The cell holds objects of type \T.
-Our wait-free implementation will impose an additional constraint on its use: every call to \fn{publish} is parametrized by an integer in range $[0,P)$ and executions of \fn{publish$_p$} for the same $p$ can not run simultaneously.
-	Both $N$ and $P$ are known when the object is created. The exact semantics of the structure are given by the single-threaded specification in Listing~\ref{hist-spec}
+%\caption{Specification of the history object}
+%\label{hist-spec}
+%\end{Listing}
 
+
+Our wait-free implementation will impose an additional constraint on its use: every call to \fn{publish} is parametrized by an integer in range $[0,P)$ and executions of \fn{publish$_p$} for the same $p$ can not run simultaneously\footnote{An obviously correct choice for the parameter is a unique thread ID.}.
+	Both $N$ and $P$ must be known when the object is created.
 % refer to impl
-\FloatBarrier
+%\FloatBarrier
 
 Our implementation is presented below:
 
 \begin{algorithmic}[1]
 	\State\var{$S$}{$\textbf{pair}\left<\int v, \int p\right>$} \Comment{Version number and $p$ of the most recently published value}
-	\State\var{$H$}{\arrayspec{N}$\textbf{pair}\left<\int v, \T T\right>$} \Comment{A circular buffer of last $N$ values (except maybe the most recent one)}
+	\State\var{$H$}{\arrayspec{N}$\textbf{pair}\left<\int v, \T T\right>$} \Comment{A circular buffer of recent $N$ values}
 	\State\var{$L$}{\arrayspec{P}$\textbf{pair}\left<\int v, \T T\right>$} \Comment{Temporary storage for values being published}
+	\filbreak
 	\Function{get-current}{}
-		\State $s \gets S.\fn{rd}$ \Comment{Possible serialization point}
+		\State $s \gets S.\fn{rd}()$ \Comment{Possible serialization point}
 		\State \fn{help}()
-		\State \Return $H[s.v \mod N].\fn{rd}$
+		\State \Return $H[s.v \mod N].\fn{rd}()$
 	\EndFunction
-	\Function{help}{}
-		\State $s \gets S.\fn{rd}$
-		\State $l \gets L[s.p].\fn{rd}$
-		\State $h \gets H[s.v \mod N].\fn{rd}$
+	\filbreak
+	\Function{help}{} \Comment{Updates $H[]$ with value from $L[]$, if required}
+		\State $s \gets S.\fn{rd}()$
+		\State $l \gets L[s.p].\fn{rd}()$
+		\State $h \gets H[s.v \mod N].\fn{rd}()$
 		\If{$l.v = s.v \textbf{and} h.v < s.v$}
-		\State $H[s.v \mod N].\fn{CAS}(h, l)$ \label{hist-help-cas}
+			\State $H[s.v \mod N].\fn{CAS}(h, l)$ \label{hist-help-cas}
 		\EndIf
 	\EndFunction
+	\filbreak
 	\Function{get}{v}
-	\State $s \gets S.\fn{rd}$ \label{hist-get-notyet-sp} \Comment{Possible serialization point}
+		\State $s \gets S.\fn{rd}()$ \label{hist-get-notyet-sp} \Comment{Possible serialization point}
 		\If{$s.v < v$}
-		\State \Return \none \label{hist-get-notyet} \Comment{The requested version hasn't been published yet}
+			\State \Return \none \label{hist-get-notyet} \Comment{The requested version hasn't been published yet}
 		\EndIf
 		\State \fn{help}()
-		\State $h \gets H[v \mod N].\fn{rd}$
+		\State $h \gets H[v \mod N].\fn{rd}()$
 		\If{$h.v = v$}
 			\State \Return $h.T$
 		\Else
 			\State \Return \none \label{hist-get-tooold}
 		\EndIf
 	\EndFunction
-	\Function{publish$_p$}{v, T}
-		\State $s \gets S.\fn{rd}$ \label{hist-pub-earlier-sp} \Comment{Possible serialization point}
+	\filbreak
+	\Function{publish$_p$}{$v, T$}
+		\State $s \gets S.\fn{rd}()$ \label{hist-pub-earlier-sp} \Comment{Possible serialization point}
 		\If{$v \neq s.v + 1$}
 			\State \Return \textbf{false} \label{hist-pub-earlier-exit}
 		\EndIf
@@ -407,7 +435,7 @@ Our implementation is presented below:
 \end{algorithmic}
 
 As the comments indicate, $L[p]$ is used to temporarily hold the value being published by \fn{publish$_p$}. The array $H$ is used to hold, roughly,
-the $N$ most recently published values (the most recently published value might be absent; exact semantics will be given by the lemmas below) together with their version numbers. The $S$ field holds the particulars of the most recently published value; the successful publish calls will serialize at the moment S changes. Our implementation contains an additional function \fn{help}. It is used internally to write the most recently published value to the $H$ array, if it isn't stored there already.
+the $N$ most recently published values (the most recently published value might be absent; exact semantics will be given by the lemmas below) together with their version numbers. The $S$ field holds the particulars of the most recently published value; the successful publish calls will serialize at the moment $S$ changes. Our implementation contains an additional function \fn{help}. It is used internally to write the most recently published value to the $H$ array, if it isn't stored there already.
 
 We will now prove some properties related to exact semantics of $H$ and $L$ and then use them to prove that our implementation serializes to the specification.
 
@@ -440,10 +468,11 @@ If $H[i] = (v, T)$ at some point then a successful call to \fn{publish$_\cdot$}$
 \end{observation}
 
 \begin{lemma}\label{lem-hist-help-comes}
-Let $\pi$ be a call to \fn{publish$_p$}. Let $\pi_q$ be a successful call to \fn{publish$_q$} and $\pi_p$ a call to \fn{publish$_p$}, both with serialization points after serialization point of $\pi$. Then there is a call to \fn{help} that starts after serialization point of $\pi$ and ends before both serialization point of $\pi_q$ and execution of line~\ref{hist-pub-latest} in $\pi_p$.
+Let $\pi$ be a call to \fn{publish$_p$}. Let $\pi_q$ be a successful call to \fn{publish$_q$} and $\pi_p$ a call to \fn{publish$_p$}, both with serialization points after serialization point of $\pi$. Then there is a call to \fn{help} that starts after the serialization point of $\pi$ and ends before the serialization point of $\pi_q$ and 
+before the execution of line~\ref{hist-pub-latest} in $\pi_p$.
 \end{lemma}
 \begin{proof}
-The serialization point of $\pi$ must happen before $\pi_q$ executes line~\ref{hist-pub-earlier-sp} -- if S changed between line~\ref{hist-pub-earlier-sp} and line~\ref{hist-pub-later-sp} of $\pi_q$, $\pi_q$ would fail.
+The serialization point of $\pi$ must happen before $\pi_q$ executes line~\ref{hist-pub-earlier-sp} -- if S has changed between line~\ref{hist-pub-earlier-sp} and line~\ref{hist-pub-later-sp} of $\pi_q$, $\pi_q$ would fail.
 Thus the call to \fn{help} from $\pi_q$ will start after serialization point of $\pi$ and will finish before the serialization point of $\pi_q$. The call to \fn{help}
 from $\pi_p$ will start after serialization point of $\pi$ ($\pi_p$ may only start after $\pi$ has finished) and will finish before line~\ref{hist-pub-latest} of $\pi_p$.
 The call to \fn{help} that finishes earlier out of these two satisfies both conditions.
@@ -455,18 +484,19 @@ If a call to \fn{help}() has executed fully (ie. started and finished) after the
 \end{lemma}
 \begin{proof}
 Let us first note that $H[v\mod N].v$ is nondecreasing.
-It thus suffices to prove that the condition is met at some point before the end of the call to \fn{help}. We will do so by induction on serialization point of the \fn{publish$_\cdot$}.
+It thus suffices to prove that the condition is met at some point before the end of the call to \fn{help}. We will do so by induction on serialization point of the invocation of \fn{publish}.
 Consider a call to \fn{publish$_p$}$(v, \cdot)$ that serializes at time $t$ and a call to \fn{help} that starts after $t$. By Lemma~\ref{lem-hist-help-comes} there is a call to \fn{help} that finishes before next serialization point of a successful \fn{publish$_\cdot$} (thus before $S$
 is modified) and before $L[p]$ is modified. Without loss of generality we can assume that the call to \fn{help} we are considering satisfies these conditions. By inductive hypothesis and Lemma~\ref{lem-hist-help-comes}, since a successful call to \fn{publish$_\cdot$}$(v-N+1, \cdot)$ has occured before time $t$, $H[v \mod N].first \geq v-N$ at time $t$. Taking into account that $H[i].v \mod N = i$, $H[v \mod N].v = v-N$ or $H[v \mod N] \geq v$ at any later point in time.
 Thus CAS in line~\ref{hist-help-cas} either succeeds, which causes the lemma's conclusion to start being satisfied, or fails, which means that the conclusion was already satisfied.
-\end{proof}
+\end{proof} % TODO: time diagram?
 
 \begin{theorem}
-The operations in the implementation of the history object serialize to the single-process structure with serialization points of \fn{publish$_\cdot$} as posited earlier.
+The operations in the implementation of the history object serialize to the single-process object with serialization points of \fn{publish$_\cdot$} as posited earlier.
 \end{theorem}
 \begin{proof}
-Note that $S.v$ is exactly the first argument of the latest successful \fn{publish$_\cdot$}. Let us first consider a call to \fn{get-current} that returns $r$. From Lemma~\ref{lem-hist-is-complete} we know that 
-$r.v \geq v.v$.
+Note that $S.v$ is equal to the first argument of the latest successful \fn{publish$_\cdot$} at all times.
+
+Let us first consider a call to \fn{get-current} that returns $r$. From Lemma~\ref{lem-hist-is-complete} we know that $r.v \geq v.v$.
 By Observation~\ref{obs-hist-is-correct}, \fn{publish$_\cdot$}$(r.v, \cdot)$ happened before the read from $H[v.v\mod N]$. If $r.v = v.v$, then \fn{publish$_\cdot$}$(r.v, \cdot)$ was the most recent successful \fn{publish$_\cdot$} at the time when $S$ was read, so we can serialize the operation there. Otherwise, \fn{publish$_i$}$(r.v, \cdot)$ has happened after that read, so we can serialize the operation just after it.
 
 Let us consider a calls to \fn{publish$_\cdot$}:
@@ -490,66 +520,70 @@ We will now use this object in our main result, the implementation of a \textsc{
 \section{The write-and-f-array}
 
 We will now present our main result -- an implementation of write-and-f-array.
-We will present a wait-free implementation of a slightly richer structure. The additional operations and return values are required due to its recursive construction.
-A single-threaded specification of the structure is presented in Listing~\ref{spec}. The \fn{version} is a black-box integer-valued function, subject to following conditions:
+We will present a wait-free implementation of a slightly richer object. The additional operations and return values are required for the recursive construction of the concurrent implementation.
+
+A single-threaded specification of the structure is shown below. It uses a \fn{version} function, which is a black-box integer-valued function, subject to following conditions:
 \begin{enumerate}
 	\item Subsequent return values of \fn{version} are nondecreasing.
 	\item If a call to \fn{version}(\textbf{false}) is followed by a call to \fn{version}(\textbf{true}), the second call must return a strictly greater integer than the first one.
 \end{enumerate}
-The second condition causes version numbers to group calls to \fn{write-and-f} into groups, such that no \fn{read} returns a value with only some updates from a group applied.
-%reason for version
-The concurrent implementation will be restricted by disallowing concurrent calls to \fn{write-and-f$_i$} for the same $i$.
 
-\begin{Listing}
+%reason for version
+%\begin{Listing}
 \begin{algorithmic}[1]
 	\State\var{$v[N]$}{\arrayspec{N}$\T$}
 	\State\var{$\text{last\_update}$}{\arrayspec{N}\int}
 	\State\var{$\text{last\_version}$}{\arrayspec{N}\int}
-	\State\var{$\text{last\_val}$}{\arrayspec{N}\T}
+	\State\var{$\text{last\_value}$}{\arrayspec{N}\T}
 	
-	\Function{update$_i$}{$T$}
+	\Function{write-and-f$_i$}{$T$}
 		\State $r \gets f(v[0], v[1],\ldots, v[N-1])$
 		\State $v[i] \gets T$
 		\State $\text{last\_update}[i] \gets \text{last\_update}[i] + 1$
 		\State $\text{last\_version}[i] \gets \fn{version}(\textbf{true})$
-		\State $\text{last\_val}[i] \gets r$
-		\State \Return $\text{last\_update}[i], \text{last\_version}[i], \text{last\_val}[i]$
+		\State $\text{last\_value}[i] \gets r$
+		\State \Return $\text{last\_update}[i], \text{last\_version}[i], \text{last\_value}[i]$
 	\EndFunction
 	\Function{get-last}{$i$}
-		\State \Return $\text{last\_update}[i], \text{last\_version}[i], \text{last\_val}[i]$
+		\State \Return $\text{last\_update}[i], \text{last\_version}[i], \text{last\_value}[i]$
 	\EndFunction
 	\Function{read}{}
 		\State \Return $\fn{version}(\textbf{false}), f(v[0], v[1],\ldots, v[N-1])$
 	\EndFunction
 \end{algorithmic}
-\caption{The enriched write-and-f-array specification}
-\label{spec}
-\end{Listing}
+%\caption{The enriched write-and-f-array specification}
+%\label{spec}
+%\end{Listing}
 
-Our implementation is conceptually very similar to Jayanti's tree-based f-array implementation. It uses a binary tree structure, with each array element assigned to a leaf.
-We will construct it recursively. The implementation for $N = 1$ is presented in Listing~\ref{impl1}. If we note that no concurrent calls to \fn{write-and-f} may be made in it, we can easily
+One can observe that the version numbers group calls to \fn{write-and-f} into groups of consecutive calls and 
+no call to \fn{read} returns a value with only some updates from a group applied.
+
+
+The concurrent implementation will be restricted by disallowing concurrent calls to \fn{write-and-f$_i$} for the same $i$.
+It is conceptually very similar to Jayanti's tree-based f-array implementation. It uses a binary tree structure, with each array element assigned to a leaf and intervals of array elements assigned to internal nodes.
+We will construct it recursively. The implementation for $N = 1$ is presented below. If we note that no concurrent calls to \fn{write-and-f} may be made in it, we can easily
 see that it is indeed correct and that all operations take constant time.
 
-\begin{Listing}[!h]
+%\begin{Listing}[!h]
 \begin{algorithmic}[1]
 	\State\var{S}{\textbf{pair<int v, \T T>}} %TODO: local var name T is misleading. rename?
 	\Function{write-and-f$_0$}{T'}
-		\State $v, T \gets S.\fn{rd}$
+		\State $v, T \gets S.\fn{rd}()$
 		\State $S.\fn{wr}((v + 1, T'))$
 		\State \Return $v + 1, v + 1, T$
 	\EndFunction
 	\Function{get-last}{$i$}
-		\State $v, T \gets S.\fn{rd}$
+		\State $v, T \gets S.\fn{rd}()$
 		\State \Return $v, v, T$
 	\EndFunction
 	\Function{read}{}
-		\State \Return $S.\fn{rd}$
+		\State \Return $S.\fn{rd}()$
 	\EndFunction
 \end{algorithmic}
-\caption{The enriched write-and-f-array snapshot implementation for $N=1$}
-\label{impl1}
-\end{Listing}
-\FloatBarrier
+%\caption{The enriched write-and-f-array snapshot implementation for $N=1$}
+%\label{impl1}
+%\end{Listing}
+%\FloatBarrier
 
 The implementation for $N > 1$ is presented below (interspersed with comments):
 \begin{algorithmic}[1]
