@@ -142,7 +142,6 @@ this\footnote{For a detailed discussion of subtleties related to this definition
 \begin{definition}
 An implementation of a concurrent object \emph{serializes} iff for every execution of a program with the implementation
 substituted for the object:
-
 For every call to object's method that completes, we can define a \emph{serialization point} in its execution
 interval, such that all these calls would return the same values if they happened instaneously at their serialization
 points.
@@ -229,13 +228,13 @@ the number of threads in the system.
 \EndFunction
 \end{algorithmic}
 
-Here we differentiate between threads: the index p in \fn{inc} corresponds to the current thread's ID from range
+Here we differentiate between threads: the index $p$ in \fn{inc} corresponds to the current thread's ID from range
 $\{0, \ldots, P-1\}$. Let us first see that this implementation actually serializes to the increment-only counter.
 Obviously, we need to choose the call to WRITE as the serialization point of \fn{inc}. From the monotonicity
 of entries of T we can infer that \fn{read} returns a value between (inclusive) the number of calls to \fn{inc} that have
 serialized before \fn{read} has started and the number of calls serialized before it has finished.
-Thus if a call to \fn{read} returns x, there is a point during its
-execution when exactly x \fn{inc}s had been serialized. We can choose this point to be the serialization point of
+Thus if a call to \fn{read} returns $x$, there is a point during its
+execution when exactly $x$ \fn{inc}s had been serialized. We can choose this point to be the serialization point of
 \fn{read}. Note that it need not correspond to an action executed by the implementation of \fn{read}.
 
 We can see that this implementation satisfies a very strong termination condition -- the number of steps every
@@ -290,7 +289,7 @@ This object, which we'll call write-and-snapshot\cite{write-and-snap}, can be de
 \EndFunction
 \end{algorithmic}
 
-For the second extension, let us note that in many cases one doesn't need the \fn{scan} operation to return the whole array, but rather some sort of its digest. The f-arrays\cite{f-array} allow one to do precisely that for digests that can be expressed as
+For the second extension, let us note that in many cases one doesn't need the \fn{scan} operation to return the whole array, but rather some sort of its digest. The f-arrays\cite{f-array} allow one to do precisely that for digests expressible as
 a result of applying an associative operation to all the array's elements (for example, if we need to retrieve the sum of all array's elements). If we call the operator $f$, the following is a specification of an f-array:
 
 \begin{algorithmic}[1]
@@ -320,7 +319,7 @@ The main result of this work is an implementation of a single-writer
 write-and-f-array: that is, one that disallows concurrent modifications to the same array element. The implementation
 uses $O(N\lg{}N)$ memory and the step complexity of the operation is $O(\lg^3N)$. 
 
-We then use this object to implement a fetch-and-add object. Fetch-and-add is a generalization of the increment-only counter we've seen. Its semantics are specified by the listing below:
+We then use this object to implement a fetch-and-add object. Fetch-and-add is a generalization of the increment-only counter from previous chapters. Its semantics are specified by the listing below:
 
 %\begin{Listing}
 \begin{algorithmic}[1]
@@ -486,7 +485,7 @@ If a call to \fn{help}() has executed fully (ie. started and finished) after the
 Let us first note that $H[v\mod N].v$ is nondecreasing.
 It thus suffices to prove that the condition is met at some point before the end of the call to \fn{help}. We will do so by induction on serialization point of the invocation of \fn{publish}.
 Consider a call to \fn{publish$_p$}$(v, \cdot)$ that serializes at time $t$ and a call to \fn{help} that starts after $t$. By Lemma~\ref{lem-hist-help-comes} there is a call to \fn{help} that finishes before next serialization point of a successful \fn{publish$_\cdot$} (thus before $S$
-is modified) and before $L[p]$ is modified. Without loss of generality we can assume that the call to \fn{help} we are considering satisfies these conditions. By inductive hypothesis and Lemma~\ref{lem-hist-help-comes}, since a successful call to \fn{publish$_\cdot$}$(v-N+1, \cdot)$ has occured before time $t$, $H[v \mod N].first \geq v-N$ at time $t$. Taking into account that $H[i].v \mod N = i$, $H[v \mod N].v = v-N$ or $H[v \mod N] \geq v$ at any later point in time.
+is modified) and before $L[p]$ is modified. Without loss of generality we can assume that the call to \fn{help} we are considering satisfies these conditions. By inductive hypothesis and Lemma~\ref{lem-hist-help-comes}, since a successful call to \fn{publish$_\cdot$}$(v-N+1, \cdot)$ has occured before time $t$, $H[v \mod N].first \geq v-N$ at time $t$. Taking into account that $H[i].v \mod N = i$, at any later point in time one of $H[v \mod N].v = v-N$ and $H[v \mod N] \geq v$ will hold.
 Thus CAS in line~\ref{hist-help-cas} either succeeds, which causes the lemma's conclusion to start being satisfied, or fails, which means that the conclusion was already satisfied.
 \end{proof} % TODO: time diagram?
 
@@ -494,18 +493,18 @@ Thus CAS in line~\ref{hist-help-cas} either succeeds, which causes the lemma's c
 The operations in the implementation of the history object serialize to the single-process object with serialization points of \fn{publish$_\cdot$} as posited earlier.
 \end{theorem}
 \begin{proof}
-Note that $S.v$ is equal to the first argument of the latest successful \fn{publish$_\cdot$} at all times.
+Note that $S.v$ is equal to the first argument of the latest successful \fn{publish} at all times.
 
 Let us first consider a call to \fn{get-current} that returns $r$. From Lemma~\ref{lem-hist-is-complete} we know that $r.v \geq v.v$.
-By Observation~\ref{obs-hist-is-correct}, \fn{publish$_\cdot$}$(r.v, \cdot)$ happened before the read from $H[v.v\mod N]$. If $r.v = v.v$, then \fn{publish$_\cdot$}$(r.v, \cdot)$ was the most recent successful \fn{publish$_\cdot$} at the time when $S$ was read, so we can serialize the operation there. Otherwise, \fn{publish$_i$}$(r.v, \cdot)$ has happened after that read, so we can serialize the operation just after it.
+By Observation~\ref{obs-hist-is-correct}, the successful \fn{publish$_\cdot$}$(r.v, \cdot)$ happened before the read from $H[v.v\mod N]$. If $r.v = v.v$, then this call to \fn{publish} was the most recent successful \fn{publish} at the time when $S$ was read, so we can serialize the operation there. Otherwise, it has happened (had its serialization point) after that read, so we can serialize the operation just after it.
 
 Let us consider a calls to \fn{publish$_\cdot$}:
 \begin{itemize}
-\item If a call to \fn{publish$_\cdot$}$(v, \cdot)$ fails in line~\ref{hist-pub-earlier-exit}, then we can see that the most recently serialized (from the point of view of line~\ref{hist-pub-earlier-sp}) successful \fn{publish$_\cdot$} published a version different than $v-1$.
-\item If a call to \fn{publish$_\cdot$}$(v, \cdot)$ fails by failing the CAS in line~\ref{hist-pub-later-sp}, then a successful \fn{publish$_\cdot$} has occured after line~\ref{hist-pub-earlier-sp} had been executed, so the most recent successful \fn{publish$_\cdot$} at the time of CAS has published a version later than $v-1$.
+\item If a call to \fn{publish$_\cdot$}$(v, \cdot)$ fails in line~\ref{hist-pub-earlier-exit}, then we can see that the most recently serialized (from the point of view of line~\ref{hist-pub-earlier-sp}) successful \fn{publish} published a version different than $v-1$.
+\item If a call to \fn{publish$_\cdot$}$(v, \cdot)$ fails by failing the CAS in line~\ref{hist-pub-later-sp}, then a successful \fn{publish$_\cdot$} has occured after line~\ref{hist-pub-earlier-sp} had been executed, so the most recent successful \fn{publish$_\cdot$} at the time of \fn{CAS} has published a version greater than $v-1$.
 \item If a call to \fn{publish$_\cdot$}$(v, \cdot)$ succeeds, then at the time of CAS in line~\ref{hist-pub-later-sp} the most recently published version is $v-1$.
 	\end{itemize}
-	This suffices to prove that the value returned by \fn{publish$_\cdot$} is always correct wrt. posited
+	This suffices to prove that the value returned by \fn{publish} is always correct with respect to posited
 	serialization order. What remains to consider are the calls to \fn{get}:
 \begin{itemize}
 	\item If a call to \fn{get}$(v)$ fails in line~\ref{hist-get-notyet}, then the most recent successful \fn{publish$_\cdot$} when line~\ref{hist-get-notyet-sp} executed had a smaller version number than requested, so we can serialize the call to \fn{get} at this line.
@@ -516,7 +515,7 @@ Let us consider a calls to \fn{publish$_\cdot$}:
 \end{proof}
 
 Obviously all operations run in $O(1)$ time. Memory complexity is $O(N+P)$, where $N$ and $P$ are the parameters defined at the beginning of this section.
-We will now use this object in our main result, the implementation of a \textsc{write-and-f-array}.
+We will now use this object in the main result of this work, the implementation of a write-and-$f$-array.
 \section{The write-and-f-array}
 
 We will now present our main result -- an implementation of write-and-f-array.
@@ -537,8 +536,8 @@ A single-threaded specification of the structure is shown below. It uses a \fn{v
 	\State\var{$\text{last\_value}$}{\arrayspec{N}\T}
 	
 	\Function{write-and-f$_i$}{$T$}
-		\State $r \gets f(v[0], v[1],\ldots, v[N-1])$
 		\State $v[i] \gets T$
+		\State $r \gets f(v[0], v[1],\ldots, v[N-1])$
 		\State $\text{last\_update}[i] \gets \text{last\_update}[i] + 1$
 		\State $\text{last\_version}[i] \gets \fn{version}(\textbf{true})$
 		\State $\text{last\_value}[i] \gets r$
@@ -555,8 +554,8 @@ A single-threaded specification of the structure is shown below. It uses a \fn{v
 %\label{spec}
 %\end{Listing}
 
-One can observe that the version numbers group calls to \fn{write-and-f} into groups of consecutive calls and 
-no call to \fn{read} returns a value with only some updates from a group applied.
+One can observe that the version numbers group calls to \fn{write-and-f} into groups of consecutive calls with no 
+intervening calls to \fn{read}.
 
 
 The concurrent implementation will be restricted by disallowing concurrent calls to \fn{write-and-f$_i$} for the same $i$.
@@ -570,7 +569,7 @@ see that it is indeed correct and that all operations take constant time.
 	\Function{write-and-f$_0$}{T'}
 		\State $v, T \gets S.\fn{rd}()$
 		\State $S.\fn{wr}((v + 1, T'))$
-		\State \Return $v + 1, v + 1, T$
+		\State \Return $v + 1, v + 1, T'$
 	\EndFunction
 	\Function{get-last}{$i$}
 		\State $v, T \gets S.\fn{rd}()$
@@ -650,9 +649,9 @@ We will show that it suffices to attempt to call \fn{update} twice to accomplish
 			\State \Return
 		\EndIf
 		\If{$side(x) = 0$}
-		\State $T \gets f(l_c.T, h_{old}.T[1])$
+			\State $T \gets f(l_c.T, h_{old}.T[1])$
 		\Else
-		\State $T \gets f(h_{new}.T[0], l_c.T)$
+			\State $T \gets f(h_{new}.T[0], l_c.T)$
 		\EndIf
 		\State $l \gets L[x].\fn{rd}$
 		\If{$l.n < l_C.n$} \label{upd-last-alreadydone}
@@ -661,11 +660,11 @@ We will show that it suffices to attempt to call \fn{update} twice to accomplish
 	\EndFunction
 	\Function{get-last}{x}
 		\State $\fn{help}(x)$
-		\State \Return $L[x].\fn{rd}$
+		\State \Return $L[x].\fn{rd}()$
 	\EndFunction
 \end{algorithmic}
 
-The use of binary search in line~\ref{help-binsch} warrants explanation. The predicate employed can obviously change its value in time. Thus, the binary search will return $v$ such that the predicate held at one point
+The use of binary search in line~\ref{help-binsch} warrants explanation. The predicate employed can obviously change its value in time. Thus, the binary search will return such $v$ that the predicate held at one point in time
 for $v$ and didn't at another point for $v-1$. We will see that this is sufficient. Indeed, the result of the binary search will be important only in the cases when the value of the predicate doesn't change during
 the search.
 
@@ -673,18 +672,9 @@ We will first prove two simple facts about \fn{update}:
 
 \begin{lemma}
 \label{lem-versions-increase}
-For any two subsequent successful calls to hist.\fn{publish} with values $h_1$ and $h_2$, $h_1.v[i] \leq h_2.v[i]$ for both $i$.
+For any two subsequent successful calls to $H.\fn{publish}$ with values $h_1$ and $h_2$, $h_1.v[i] \leq h_2.v[i]$ for both $i$.
 \end{lemma}
-\begin{proof}
-Assume otherwise. Consider the first pair $p_1, p_2$ of consecutive calls to \fn{publish} that contradicts the Lemma (see Figure~\ref{fig-versions-increase}). The only place \fn{publish} is called is line \ref{upd-publish}
-in \fn{update}.
-$p_2$ had its most recent call to \fn{get-current} (denoted by $g_2$) in line~\ref{upd-getown} sometime earlier. No successful publish could have occured between $g_2$ and $p_2$; otherwise $p_2$
-would have failed.
-Thus, $p_1$ must have occured before $g_2$ and so its execution of lines \ref{upd-getch-0} and \ref{upd-getch-1} (denoted by ``read children'' on the diagram) must have occured strictly earlier than
-the same for the second call. This together with monotonicity of versions in children delivers the contradiction.
-\end{proof}
-
-\begin{figure}
+\begin{figure}[!h]
 \begin{tikzpicture}
 	\atomic{prev_getch}{read children}{1}{1}
 	\atomic{prev_pub}{$p_1$}{3}{1}
@@ -700,12 +690,21 @@ the same for the second call. This together with monotonicity of versions in chi
 
 	\draw[arrows={-triangle 45}] (prev_pub) to (get_ver);
 \end{tikzpicture}
-\caption{Diagram for proof of Lemma~\ref{lem-versions-increase} ($p_i$ -- call to \fn{publish}; $g_i$ -- call to \fn{get-current} in line~\ref{upd-getown} that corresponds to $p_i$)}
+\caption{Diagram for proof of Lemma~\ref{lem-versions-increase} ($p_i$ -- call to \fn{publish}; $g_i$ -- call to \fn{get-current} in line~\ref{upd-getown} that corresponds to $p_i$).}
 \label{fig-versions-increase}
 \end{figure}
+\begin{proof}
+Assume otherwise. Consider the first pair $p_1, p_2$ of consecutive calls to \fn{publish} that contradicts the Lemma (see Figure~\ref{fig-versions-increase}). The only place \fn{publish} is called is line \ref{upd-publish}
+in \fn{update}.
+$p_2$ had its most recent call to \fn{get-current} (denoted by $g_2$) in line~\ref{upd-getown} sometime earlier. No successful publish could have occured between $g_2$ and $p_2$; otherwise $p_2$
+would have failed.
+Thus, $p_1$ must have occured before $g_2$ and so its execution of lines \ref{upd-getch-0} and \ref{upd-getch-1} (denoted by ``read children'' on the diagram) must have occured strictly earlier than
+the same for the second call. This together with monotonicity of versions in children delivers the contradiction.
+\end{proof}
+
 
 \begin{lemma}
-	For every execution of \fn{write-and-f$_i$}: during execution of lines \ref{updcall1} and \ref{updcall2} at least one successful call to \fn{update} occurs.
+	For every execution of \fn{write-and-f}: during execution of lines \ref{updcall1} and \ref{updcall2} at least one successful call to \fn{update} occurs.
 \end{lemma}
 \begin{figure}
 \begin{tikzpicture}
@@ -731,7 +730,7 @@ the same for the second call. This together with monotonicity of versions in chi
 	\draw[dashed] (6,-2) -- (12,-2);
 	\draw (6.5,-2) -- (11.5,-2);
 \end{tikzpicture}
-\caption{Consequences of two failed \fn{update} calls ($g_i$ -- call to \fn{get-current} in line~\ref{upd-getown}, $p^S_{i}$ -- successful call to \fn{publish} in line~\ref{upd-publish}, $p^F_{i}$ -- failed call to \fn{publish} in line~\ref{upd-publish})}
+\caption{Consequences of two failed \fn{update} calls ($g_i$ -- call to \fn{get-current} in line~\ref{upd-getown}, $p^S_{i}$ -- successful call to \fn{publish} in line~\ref{upd-publish}, $p^F_{i}$ -- failed call to \fn{publish} in line~\ref{upd-publish}).}
 \label{fig-only-two-pubs}
 \end{figure}
 
@@ -755,7 +754,7 @@ Before we prove that the implementation is correct, we need the following two le
 \end{lemma}
 \begin{proof}
 	We will prove this Lemma by induction on $n$. Let $p(v)$ be the time the successfull call to \fn{publish}$(v, \cdot)$ occured. Consider an \fn{update$_i$} that was serialized at $p(v)$.
-	For every $u \equiv i (\mod N)$, a call to $\fn{help}(i)$ starts and finishes between $p(u-1)$ and $p(u)$. Thus, there is such a call that starts and finishes between $p(v)$ and $p(v+N)$.
+	For every $u \equiv i \left(\mbox{mod } N\right)$, a call to $\fn{help}(i)$ starts and finishes between $p(u-1)$ and $p(u)$. Thus, there is such a call that starts and finishes between $p(v)$ and $p(v+N)$.
 	Without loss of generality we can assume that the call to \fn{help} from the Lemma's hypothesis executes in this time interval. In that case, the binary search from line~\ref{help-binsch} will not see any
 	$\fn{get}(x)$ for $x \geq v-1$ returning \none and will	return version $v$. For the same reason, both \fn{get}s will succeed.
 
@@ -768,12 +767,12 @@ Before we prove that the implementation is correct, we need the following two le
 \begin{lemma}
 	If a call to $\fn{help}(i)$ sets $L[i]$ to $n, v, T$, then by the time the call has finished: \label{last-is-correct}
 \begin{enumerate}
-	\item \fn{write-and-f$_i$} has been called at least $n$ times
-	\item Let $n_c, v_c, T_c$ be the return value of the $n^{\text{th}}$ call to $C[side(i)].\fn{write-and-f}_{child\_id(p)}$. Let $v'$ and $h_new$ be the version and node value published at the serialization point of the $n^{\text{th}}$
-		\fn{write-and-f$_i$} and $h_old$ be the node value published with version $v'-1$. Then $v = v'$ and:
+	\item \fn{write-and-f$_i$} has been called at least $n$ times.
+	\item Let $n_c, v_c, T_c$ be the return value of the $n^{\text{th}}$ call to $C[side(i)].\fn{write-and-f}_{child\_id(p)}$. Let $v'$ and $h_{new}$ be the version and node value published at the serialization point of the $n^{\text{th}}$
+		\fn{write-and-f$_i$} and $h_{old}$ be the node value published with version $v'-1$. Then $v = v'$ and:
 		\begin{itemize}
-			\item If $side(p) = 0$ then $T = f(T_c, h_{old}.T[1])$
-			\item If $side(p) = 1$ then $T = f(h_{new}.T[0], T_c)$
+			\item if $side(p) = 0$ then $T = f(T_c, h_{old}.T[1])$,
+			\item if $side(p) = 1$ then $T = f(h_{new}.T[0], T_c)$.
 		\end{itemize}
 \end{enumerate}
 \end{lemma}
@@ -797,8 +796,8 @@ Before we prove that the implementation is correct, we need the following two le
 	
 	Consider a set of \fn{write-and-f} calls that are serialized together. Let $h_{new}$ and $h_{old}$ be the history elements published, respectively, at the serialization point and most recently before it. Let $a_i$ be the sequence of return values
 	of $C[0].\fn{write-and-f}$ calls corresponding to \fn{write-and-f} calls in question, in serialization order. Let $b_i$ be a similar sequence for $C[1]$. By Lemma~\ref{lem-versions-increase} these are exactly the calls to
-$C[i].\fn{write-and-f}$ serialized with versions in $\left(h_{old}.v[i], h_{new}.v[i]\right]$. By Lemma~\ref{last-is-correct} the sequence returned
-by the \fn{write-and-f} calls is $f(a_0, b_0), $ $f(a_1, b_0),$ $\ldots, $ $f(h_{new}.T[0], b_1), $ $f(h_{new}.T[0], b_2), \ldots$ in the order of serialization. 
+	$C[j].\fn{write-and-f}$ serialized with versions in $\left(h_{old}.v[j], h_{new}.v[j]\right]$ for $j \in \{0, 1\}$. By Lemma~\ref{last-is-correct} the sequence returned
+by the \fn{write-and-f} calls is $f(a_0, b_0), $ $f(a_1, b_0),$ $\ldots, $ $f(h_{new}.T[0], b_0), $ $f(h_{new}.T[0], b_1), \ldots$ in the order of serialization. 
 Additionally, $f(h_{new}.T[0], h_{new}.T[1])$ is the value that would be returned by any \fn{read} calls until the next serialization point of \fn{write-and-f}.
 This suffices to show that the return values of consecutive calls to \fn{write-and-f} are actually the results of applying the updates.
 This proves that values returned by \fn{get} and \fn{update} are correct wrt. posited serialization order.
@@ -830,8 +829,8 @@ The correctness of the implementation was tested experimentally both on real har
 It substitues its own
 implementation of synchronization primitives and atomic variables and runs user-supplied tests multiple times, with various interleaving of threads.
 It can detect data races on non-atomic variables, deadlock conditions, and failed user-supplied invariant and assertion
-checks. One notable feature is support for reduced consistency operations -- Relacy can simulate acquire/release semantics, as specified in the C++11 atomic variables library.
-Our fetch-and-add implementation can be compiled both to run on bare hardware and to run in Relacy. The use of Relacy not only privided confidence about correctness of the implementation, but also allowed us to downgrade
+checks. One notable feature is support for atomic operations with reduced consistency -- Relacy can simulate acquire/release semantics, as specified in the C++11 atomic variables library.
+Our fetch-and-add implementation can be compiled both to run on bare hardware and to run in Relacy. The use of Relacy not only provided confidence about correctness of the implementation, but also allowed us to downgrade
 consistency guarantees of some writes.
 
 
@@ -840,10 +839,10 @@ The benchmark created a fetch-and-add object and started a preset number of thre
 to stop and their operation counters were summed. For comparison, the same benchmark was run with the fetch-and-add object implemented by a simple read-modify-write loop. All benchmarks were run when the machine was
 minimally loaded (had 5 minute load average smaller than 0.5 at the start of the benchmark).
 
-The reuslts of the benchmark are shown in Figure~x. The figure contains a plot of average time it takes to complete one operation in function of the number of concurrently executing threads.
+The results of the benchmark are shown in Figure~x. The figure contains a plot of average time it takes to complete one operation in function of the number of concurrently executing threads.
 The horizontal scale of the figure is proportional to the square of the logarithm of number of threads. The reason for this is that the optimistic time complexity
 of our fetch-and-add object is $\Theta(\log^2 P)$. We can see that the graph for our implementation approximates a straight line up to XX threads, where it starts to diverge upward. This peculiar divergence disappears
-if we assign one core to each thread and force it to run only there (by setting CPU affinity). Other affinity settings yielded a graph similar to one of these two. We were unable to explain this behaviour. It might
+if we assign one core to each thread and force it to run only there (by setting CPU affinity). Other affinity settings yielded graphs similar to one of these two. We were unable to explain this behaviour. It might
 be worth noting that the anomaly in the no-affinity case happens when it starts using all 4 physical CPUs.
 
 It can be easily seen from the graph that our fetch-and-add object is far from practical. It is about 100 times slower than the naive lock-free implementation for small numbers of threads and about 40 times slower
