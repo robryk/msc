@@ -3,6 +3,7 @@
 \usepackage{fullpage}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
+\usepackage{graphics}
 
 \usepackage{amsmath}
 \usepackage{amssymb}
@@ -51,9 +52,21 @@ We provide a wait-free implementation of an $N$-element write-and-f-array with $
 The write-and-f-array can be applied to create a fetch-and-add object for $P$ processes with $O(P \log P)$ memory complexity and $O(\log^3 P)$ step complexity of the fetch-and-add operation. This is the first implementation of fetch-and-add with polylogarithmic step complexity and subquadratic memory complexity that can be implemented without CAS or LL/SC objects of unrealistic size\cite{ellen-fai}.
 \end{abstract}
 \clearpage
+\tableofcontents
+\clearpage
 \section{Introduction}
 
-\subsection{Concurrent objects}
+The advent of popular manycore systems has made concurrent programming for shared memory systems an important
+topic. With increasing parallelism available in a single shared-memory system, performance of techniques
+used to communicate between concurrently executing threads, or to access memory common to many such threads,
+is becoming one of the most significant components of the performance of an application running on such a system.
+In many cases of communication-heavy tasks simple coarse-grained locking is not enough to yield good performance,
+so programmers need to resort to lock-less communication and concurrent data structures. This work provides a new
+data structure with a implementation that can be used concurrently and doesn't use locks, and uses is to create
+an implementation of a well known structure with improved memory usage.
+
+
+\subsection{Concurrent Objects}
 A useful abstraction in a single-threaded system is an object: an entity with a set of methods one can invoke
 and a specification of semantics of these methods. Naturally, a program can use multiple objects and invoke
 their methods in any order.
@@ -108,11 +121,11 @@ a single-threaded program (this will be our method of choice of providing object
 \end{algorithmic}
 
 Intuitively, such a register holds a value that can be read (by \fn{rd}), modified unconditionally (by \fn{wr})
-and modified conditionally (by \fn{CAS}). It's interesting due to its universality properties % TODO: cite universality
-and because it's
+and modified conditionally (by \fn{CAS}). It's interesting due to its universality properties\cite{cas-univ} % TODO: cite universality
+and because it is
 commonly seen in real-world hardware. % T?
 
-\begin{example}
+\begin{example}\label{ex-simple}
 Let's consider two threads, executing following pseudocodes (X and Y are two CAS objects, with initial value 0):
 
 \begin{enumerate}
@@ -127,9 +140,38 @@ Let's consider two threads, executing following pseudocodes (X and Y are two CAS
 \end{algorithmic}
 \end{enumerate}
 
-Figure~xx presents a possible execution of such two threads. Note that in any correct execution,
+Figure~\ref{fig-ex-simple} presents a possible execution of such two threads. Note that in any correct execution,
 at least one of the \fn{rd}() calls returns 1.
 \end{example}
+
+\begin{figure}[!h]
+\begin{tikzpicture}
+	\atomic{x_wr_1}{X.\fn{wr}(1)}{0.5}{0}
+	\atomic{y_rd_1}{Y.\fn{rd}()=0}{2.5}{0}
+	\atomic{y_wr_1}{Y.\fn{wr}(1)}{3.5}{1}
+	\atomic{x_rd_1}{X.\fn{rd}()=1}{5.5}{1}
+	\draw (0,0) to (6,0);
+	\draw (0,-1) to (6,-1);
+
+	\atomic{x_wr_2}{X.\fn{wr}(1)}{8.0}{0}
+	\atomic{y_rd_2}{Y.\fn{rd}()=1}{10.0}{0}
+	\atomic{y_wr_2}{Y.\fn{wr}(1)}{8.5}{1}
+	\atomic{x_rd_2}{X.\fn{rd}()=1}{10.5}{1}
+	\draw (7.5,0) to (11,0);
+	\draw (7.5,-1) to (11,-1);
+
+
+	%\draw[dashed] (0,-1) to (10,-1);
+	%\draw[dashed] (0,0) to (10,0);
+	%\draw (0.5,-1) to (3.5,-1);
+	%\draw (4.5,0) to (9.5,0);
+
+	%\draw[arrows={-triangle 45}] (prev_pub) to (get_ver);
+\end{tikzpicture}
+
+\caption{Two possible interleaved executions of threads from Example~\ref{ex-simple}.}
+\label{fig-ex-simple}
+\end{figure}
 
 \subsection{Serialization}
 In many situations it would be convenient to have more complicated concurrent objects: counters that can be incremented,
@@ -137,7 +179,7 @@ queues that can be pushed to and popped from, etc. Alas, real-world hardware usu
 directly. We will thus implement them using CAS registers or other simpler objects: we will substitute a set of simpler objects for every such object and for every method call on this object, execute a procedure that implements it instead.
 However, these prodecures might run concurrently, so we can't blindly use a single-threaded implementation of the object.
 Obviously, we will want such substitution to preserve semantics of the program in which it was substituted. The following condition immediately implies
-this\footnote{For a detailed discussion of subtleties related to this definition, refer to chapter 3.3-3.6 of TheArt}:
+this\footnote{For a detailed discussion of subtleties related to this definition, refer to chapter 3.3-3.6 of \cite{TheArt}}:
 
 \begin{definition}
 An implementation of a concurrent object \emph{serializes} iff for every execution of a program with the implementation
@@ -240,18 +282,18 @@ execution when exactly $x$ \fn{inc}s had been serialized. We can choose this poi
 We can see that this implementation satisfies a very strong termination condition -- the number of steps every
 procedure takes is bounded and the bound depends only on the number of threads (and not on the behaviour of
 the scheduler). We will call such implementations \emph{wait-free}. For a discussion of weaker
-termination guarantees, see chapter 3.7 of TheArt.
+termination guarantees, see chapter 3.7 of \cite{TheArt}.
 
-Every object that has a single-threaded specification has a wait-free implementation\ref{universal-wf} using
+Every object that has a single-threaded specification has a wait-free implementation\cite{cas-univ} using
 only CAS registers.
-However, this construction yields objects with operation time complexities inflated at least by a factor
+However, all currently-known such construction yield objects with operation time complexities inflated at least by a factor
 of the number of threads.
 Thus, creating faster wait-free implementations of data structures is interesting, also from a practical
 point of view.
 
 \subsection{Snapshots}
 
-The object implemented in this paper is a generalization of a popular building block for multithreaded objects
+The object implemented in this work is a generalization of a popular building block for multithreaded objects
 -- an atomic snapshot object\cite{snapshot-idea}. Its semantics can be defined by following single-threaded pseudocode:
 
 \begin{algorithmic}[1]
@@ -305,7 +347,7 @@ a result of applying an associative operation to all the array's elements (for e
 There is an implementation of f-array with step complexities of \fn{update} and \fn{scan} being respectively $O(\log N)$ and $O(1)$ and the memory complexity
 being linear in $N$.
 
-This paper introduces a write-and-f-array: an object that combines these two modifications. Its semantics are defined by the single-threaded specification below:
+This work introduces a write-and-f-array: an object that combines these two modifications. Its semantics are defined by the single-threaded specification below:
 
 \begin{algorithmic}[1]
 	\State\var{$T$}{\arrayspec{N}$\T$}
@@ -516,7 +558,7 @@ Let us consider a calls to \fn{publish$_\cdot$}:
 
 Obviously all operations run in $O(1)$ time. Memory complexity is $O(N+P)$, where $N$ and $P$ are the parameters defined at the beginning of this section.
 We will now use this object in the main result of this work, the implementation of a write-and-$f$-array.
-\section{The write-and-f-array}
+\section{The Write-and-f-array}
 
 We will now present our main result -- an implementation of write-and-f-array.
 We will present a wait-free implementation of a slightly richer object. The additional operations and return values are required for the recursive construction of the concurrent implementation.
@@ -816,16 +858,20 @@ a fetch-and-add object for $P$ threads with $O(\log^3 P)$ step complexity and $O
 current value in $O(1)$ time.
 
 \section{Implementation}
-A fetch-and-add object was implemented using the mentioned construction from the write-and-f object. The implementation is in C++ and uses the C++11 standard library support for atomic operations.
-The implementation modifies the object described in this paper so as to constrain the size of CAS object required to no more than twice the size of a version variable. It uses 64-bit versions and
-thus requires 128-bit CAS objects. Thus, it runs on 64-bit Intel architecture processors, but not on 32-bit ones.
+A fetch-and-add object was implemented using the above-mentioned construction from the write-and-f object. The implementation is written in C++ and uses the C++11 standard library support for atomic operations. It is published on Github and its version current as of the time this paper is written is available at:\\\verb+https://github.com/robryk/parsum/tree/d3433f7f7b137b52a73cfb244d46081528c696c3+.
+
+Direct implementation of previously described algorithm would require CAS objects of size larger than the
+64-bit Intel processors support. However, the way most of these objects are accessed in the implementation makes
+it possible to split them into multiple CAS objects. The only CAS objects that don't afford this transformation
+are the version number holders from the history object. We use 64-bit versions and thus even these objects are
+no larger than 128 bits. Thus, our implementation can run on 64-bit Intel architecture processors, but not on 32-bit ones.
 
 Unfortunately, the C++ standard library support for atomic operations doesn't allow atomic reads of a part of a larger atomic variable (specifically, reads of 64-bit halves of a 128-bit variable).
 As 128-bit atomic reads on amd64 are very costly
 (they use a 128-bit wide CAS), limiting their number was very important for the efficiency's sake. Thus, the implementation makes an unwarranted assumption that an atomic variable
-has the same memory layout as a normal, non-atomic variable of the same size. This assumption holds for gcc VERSION on amd64.
+has the same memory layout as a normal, non-atomic variable of the same size. This assumption holds for gcc 4.6 on amd64.
 
-The correctness of the implementation was tested experimentally both on real hardware and by using the Relacy Race Detector\ref{rrd}. Relacy Race Detector is a framework for testing multi-threaded programs in C++11.
+The correctness of the implementation was tested experimentally both on real hardware and by using the Relacy Race Detector\cite{rrd}. Relacy Race Detector is a framework for testing multi-threaded programs in C++11.
 It substitues its own
 implementation of synchronization primitives and atomic variables and runs user-supplied tests multiple times, with various interleaving of threads.
 It can detect data races on non-atomic variables, deadlock conditions, and failed user-supplied invariant and assertion
@@ -839,16 +885,22 @@ The benchmark created a fetch-and-add object and started a preset number of thre
 to stop and their operation counters were summed. For comparison, the same benchmark was run with the fetch-and-add object implemented by a simple read-modify-write loop. All benchmarks were run when the machine was
 minimally loaded (had 5 minute load average smaller than 0.5 at the start of the benchmark).
 
-The results of the benchmark are shown in Figure~x. The figure contains a plot of average time it takes to complete one operation in function of the number of concurrently executing threads.
+The results of the benchmark are shown in Figure~\ref{fig-meas}. The figure contains a plot of average time it takes to complete one operation as a function of the number of concurrently executing threads. 
 The horizontal scale of the figure is proportional to the square of the logarithm of number of threads. The reason for this is that the optimistic time complexity
-of our fetch-and-add object is $\Theta(\log^2 P)$. We can see that the graph for our implementation approximates a straight line up to XX threads, where it starts to diverge upward. This peculiar divergence disappears
+of our fetch-and-add object is $\Theta(\log^2 P)$. We can see that the graph for our implementation approximates a straight line up to about 30 threads, where it starts to diverge upward. This peculiar divergence disappears
 if we assign one core to each thread and force it to run only there (by setting CPU affinity). Other affinity settings yielded graphs similar to one of these two. We were unable to explain this behaviour. It might
-be worth noting that the anomaly in the no-affinity case happens when it starts using all 4 physical CPUs.
+be worth noting that the anomaly in the no-affinity case happens when we start using all 4 physical CPUs.
 
-It can be easily seen from the graph that our fetch-and-add object is far from practical. It is about 100 times slower than the naive lock-free implementation for small numbers of threads and about 40 times slower
+It can be easily seen from the graph that our fetch-and-add object is far from practical. It is about 100 times slower than the naive lock-free implementation for small numbers of threads and about 10 times slower
 for larger numbers of threads. We believe that this implementation is suboptimal, although achieving similar performance as the naive implementation seems impossible. One change that could improve performance
-of this implementation is changing the arity of the tree. The construction can easily be adapted to trees with larger arity and this would decrease the number of expensive CAS operations, while increasing the number
+of this implementation is changing the arity of the tree. The construction can easily be adapted to trees with larger arity and this might decrease the number of expensive CAS operations at the expense of the number
 of atomic reads, which are comparatively cheap on Intel processors.
+
+\begin{figure}
+\includegraphics{meas.png}
+\caption{Results of the benchmark}
+\label{fig-meas}
+\end{figure}
 
 \section{Extensions and Open Problems}
 
@@ -859,22 +911,35 @@ If we then enlarge the history size to $O(N\log N)$, Lemma~\ref{last-is-complete
 The structure can be straightforwardly modified to use LL/CS instead of CAS, albeit it then requires the ability to have two outstanding LLs at the same time. The modified version can be further modified to use
 bounded version numbers, from a range of size $O(N)$.
 
-We can also modify the history structure and the $L$ array so that we need CAS objects of size $O(\log M) + O(1)$, independently of the size of \T.
+The C++ implementation's performance is most likely far from optimal. The effect of tree's arity on performance
+seems to be worth investigating.
 
 We pose two problems:
 
-Our implementation of write-and-f-array is single-writer, so it's natural to consider the multi-writer write-and-f-array. Can we construct a multi-writer write-and-f-array in subquadratic memory with similar step complexities of the operations?
+\begin{itemize}
+	\item Our implementation of write-and-f-array is single-writer, so it's natural to consider the multi-writer write-and-f-array. Can we construct a multi-writer write-and-f-array in subquadratic memory with similar step complexities of the operations?
 
-The memory consumption of write-and-f-array implemented with atomic registers and CAS or LL/CS objects is bounded from below by a linear function of the number of processes that can execute \fn{write-and-f} concurrently\cite{lowerbound}, so it must be $\Omega(N)$. Can we achieve lower memory and/or step complexities?
+	\item The memory consumption of write-and-f-array implemented with atomic registers and CAS or LL/CS objects is bounded from below by a linear function of the number of processes that can execute \fn{write-and-f} concurrently\cite{lowerbound}, so it must be $\Omega(N)$. Can we achieve lower memory and/or step complexities?
+\end{itemize}
+
+\section{Conclusions}
+The fetch-and-f-array was introduced and its wait-free implementation with polylogarithmic step complexities
+and near-linear memory complexity was provided. This in turn was used to produce a fetch-and-add counter
+with step complexity polylgarithmic in number of threads and memory complexity nearly linear in number
+of threads. The counter was implemented on real hardware, benchmarked, and found to be between 10 and 100
+times slower than a trivial lock-free counter. A possible constant-factor improvement was outlined, but
+not investigated. Some open problems were stated.
 
 \section{Acknowledgements}
-The author would like to thank dr. Grzegorz Herman for many fruitful discussions and help while preparing this paper. I would also like to thank Szymon Acedański for his help in improving the presentation of this paper.
+The author would like to thank his advisor, dr. Grzegorz Herman for many fruitful discussions and help while preparing this paper. He would also like to thank Szymon Acedański for his help in improving the presentation of this paper.
 
 This work was supported by the Polish Ministry of Science and Higher Education program ``Diamentowy Grant''.
 
 \newpage
 
 \begin{thebibliography}{9}
+	\bibitem{TheArt} Herlihy M., Shavit N. ``The Art of Multiprocessor Programming'', Morgan Kaufmann Publishers Inc., 2008
+	\bibitem{cas-univ} Herlihy M. ``Wait-free synchronization'', ACM Trans. Program. Lang. Syst. 13, 1, pp. 124--149 (1991)
 	\bibitem{snapshot-impl} Riany Y., Shavit N., Touitou D. ``Towards a practical snapshot algorithm'', Theoretical Computer Science 269, pp. 163--201 (2001)
 	\bibitem{snapshot-idea} Afek Y., Attiya H., Dolev D., Gafni E., Merritt M., Shavit N. ``Atomic snapshots of shared memory'', Journal of the ACM 40, pp. 873--890 (1993)
 	\bibitem{write-and-snap} Afek Y., Weisberger E. ``The instancy of snapshots and commuting objects'', Journal of Algorithms 30.1, pp. 68--105 (1999)
@@ -884,6 +949,7 @@ This work was supported by the Polish Ministry of Science and Higher Education p
 	\bibitem{lowerbound} Fich F. E., Hendler D., Shavit N. ``Linear lower bounds on real-world implementations of concurrent objects'', Foundations of Computer Science, pp. 165--173 (2005)
 	\bibitem{faa-sync} Freudenthal, E., Gottlieb, A. ``Process coordination with fetch-and-increment'', Proceedings of ASPLOS-IV, pp. 260–-268 (1991)
 	\bibitem{faa-queue} Goodman, J., Vernon, M., Woest, P. ``Efficent synchronization primitives for large-scale cache-coherent multiprocessors'', Proceedings of ASPLOS-III, pp. 64-–75 (1989)
+	\bibitem{rrd} Vyukov D., Relacy Race Detector, \verb+http://www.1024cores.net/home/relacy-race-detector+
 \end{thebibliography}
 
 \end{document}
