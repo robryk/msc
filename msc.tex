@@ -5,6 +5,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{graphics}
+\usepackage{varwidth}
 
 \usepackage{amsmath}
 \usepackage{amssymb}
@@ -42,7 +43,7 @@
 
 \maketitle
 \begin{abstract}
-	We introduce a new shared memory object: the write-and-f-array, provide its wait-free implementation and use it to construct an improved wait-free implementation of the fetch-and-add object. The write-and-f-array generalizes single-writer write-and-snapshot\cite{write-and-snap} object in a similar way that the f-array\cite{f-array} generalizes the multi-writer snapshot object. More specifically, a write-and-f-array is parametrized by an associative operator $f$ and is conceptually an array with two atomic operations:
+	We introduce a new shared memory object: the write-and-f-array, provide its wait-free implementation and use it to construct an improved wait-free implementation of the fetch-and-add object. The write-and-f-array generalizes single-writer write-and-snapshot\cite{write-and-snap} object in a similar way that the f-array\cite{f-array} generalizes the multi-writer snapshot object. More specifically, a write-and-f-array is parameterized by an associative operator $f$ and is conceptually an array with two atomic operations:
 
 \begin{itemize}
 \item write-and-f modifies a single array's element and returns the result of applying $f$ to all the elements,
@@ -80,7 +81,7 @@ the speed of execution and delays of the threads -- they may wait arbitrarily lo
 We also assume that method calls on the objects complete instanteously, and that no two of them happen at the same time.
 This allows us to define semantics of the objects in the same fashion we define them in the single-threaded case:
 methods of every object are invoked in a known order, so single-threaded semantics suffice to determine the object's behaviour\footnote{The whole program may still be nondeterministic, due to nondeterministic scheduling.}.
-We will call such objects concurrent objects to emphasize that they may be accessed concurrently.
+We will call such objects \emph{concurrent objects} to emphasize that they may be accessed concurrently.
 
 %An asynchronous shared memory system consists of a number of threads and a number of shared objects. Each
 %thread is a Turing-complete automaton that can addiationally execute external actions on the shared objects.
@@ -187,7 +188,7 @@ this\footnote{For a detailed discussion of subtleties related to this definition
 An implementation of a concurrent object \emph{serializes} iff for every execution of a program with the implementation
 substituted for the object:
 For every call to object's method that completes, we can define a \emph{serialization point} in its execution
-interval, such that all these calls would return the same values if they happened instaneously at their serialization
+interval (between its first and last constituent operation), such that all these calls would return the same values if they happened instaneously at their serialization
 points.
 \end{definition}
 
@@ -288,7 +289,7 @@ termination guarantees, see chapter 3.7 of \cite{TheArt}.
 
 Every object that has a single-threaded specification has a wait-free implementation\cite{cas-univ} using
 only CAS registers.
-However, all currently-known such constructions yield objects with operation time complexities inflated at least by a factor
+However, all currently-known such constructions yield objects with step complexities inflated at least by a factor
 of the number of threads.
 Thus, creating faster wait-free implementations of data structures is interesting, also from a practical
 point of view.
@@ -391,14 +392,11 @@ mutual exclusion, barrier synchronization\cite{faa-sync}, or work queues\cite{fa
 We will first implement a helper object -- the history object. Intuitively, it contains a versioned memory cell and allows retrieval of past $N$ values of the cell. The cell holds objects of type \T. The semantics of this object are precisely specified by the following single-threaded implementation:
 %\begin{Listing}[!h]
 \begin{algorithmic}[1]
-	\filbreak
-	\State\var{$H$}{\arrayspec{\ldots}$\T$}
+	\State\var{$H$}{\arrayspec{\ldots}$\T$} \Comment{An unbounded array of values}
 	\State\var{$V$}{\int} \Comment{Current version}% fixme formatting
-	\filbreak
 	\Function{get-current}{}
 		\State \Return $V$, $H[V]$
 	\EndFunction
-	\filbreak
 	\Function{get}{$v$}
 	\If{$v \leq V - N \textbf{ or } v > V$}
 			\State \Return \none
@@ -406,7 +404,6 @@ We will first implement a helper object -- the history object. Intuitively, it c
 		\State \Return $H[v]$
 		\EndIf
 	\EndFunction
-	\filbreak
 	\Function{publish}{$v$, $T$}
 		\If{$v = V + 1$}
 			\State $H[v] \gets T$
@@ -433,13 +430,11 @@ Our implementation is presented below:
 	\State\var{$S$}{$\textbf{pair}\left<v: \int, p: \int\right>$} \Comment{Version number and $p$ of the most recently published value}
 	\State\var{$H$}{\arrayspec{N}$\textbf{pair}\left<v: \int, T: \T\right>$} \Comment{A circular buffer of recent $N$ values}
 	\State\var{$L$}{\arrayspec{P}$\textbf{pair}\left<v: \int, T: \T\right>$} \Comment{Temporary storage for values being published}
-	\filbreak
 	\Function{get-current}{}
 		\State $s \gets S.\fn{rd}()$ \Comment{Possible serialization point}
 		\State \fn{help}()
 		\State \Return $H[s.v \mod N].\fn{rd}()$
 	\EndFunction
-	\filbreak
 	\Function{help}{} \Comment{Updates $H[]$ with value from $L[]$, if required}
 		\State $s \gets S.\fn{rd}()$
 		\State $l \gets L[s.p].\fn{rd}()$
@@ -448,7 +443,6 @@ Our implementation is presented below:
 			\State $H[s.v \mod N].\fn{CAS}(h, l)$ \label{hist-help-cas}
 		\EndIf
 	\EndFunction
-	\filbreak
 	\Function{get}{v}
 		\State $s \gets S.\fn{rd}()$ \label{hist-get-notyet-sp} \Comment{Possible serialization point}
 		\If{$s.v < v$}
@@ -462,7 +456,6 @@ Our implementation is presented below:
 			\State \Return \none \label{hist-get-tooold}
 		\EndIf
 	\EndFunction
-	\filbreak
 	\Function{publish$_p$}{$v, T$}
 		\State $s \gets S.\fn{rd}()$ \label{hist-pub-earlier-sp} \Comment{Possible serialization point}
 		\If{$v \neq s.v + 1$}
@@ -646,7 +639,13 @@ The implementation for $N > 1$ is presented below (interspersed with comments):
 \end{algorithmic}
 
 C[0] and C[1] are the subobjects from the recursive construction -- they are of size $\lceil{}N/2\rceil{}$ and $\lfloor{}N/2\rfloor{}$, respectively. Array elements of the enclosing
-structure are mapped bijectively to the array elements of these two subobjects. Let's denote the mapping by $side(i)$ and $child\_id(i)$: the element $i$ is mapped to element $child\_id(i)$ in C[$side(i)$].
+structure are mapped bijectively to consecutive array elements of these two subobjects. The mapping is defined by following functions (the element $i$ is mapped to element $child\_id(i)$ in C[$side(i)$]):
+\begin{equation*}
+side(i) = \begin{cases} 0&i\in\{0,\ldots,\lceil{}N/2\rceil{}-1\}\\1&i\in\{\lceil{}N/2\rceil{},\ldots,N-1\}\end{cases}
+\end{equation*}
+\begin{equation*}
+child\_id(i) = \begin{cases} i&i\in\{0,\ldots,\lceil{}N/2\rceil{}-1\}\\i-\lceil{}N/2\rceil{}&i\in\{\lceil{}N/2\rceil{},\ldots,N-1\}\end{cases}
+\end{equation*}
 History object H is used to store the object's current value (the value that would be returned by \fn{read}) and past values. The version numbers exported by the history object correspond to the values returned by \fn{version}
 in the specification. The elements of H aren't just values; they instead contain the values of both children together with their versions.
 The array L is used to store the values \fn{get-last} should return, but the values there might be stale (we will prove bounds on their staleness later on).
@@ -674,7 +673,7 @@ The array L is used to store the values \fn{get-last} should return, but the val
 	\algstore{impl}
 \end{algorithmic}
 
-The implementation of \fn{read} and \fn{write-and-f} strongly resemble the f-array. \fn{write-and-f} uses a helper function \fn{update}, that intuitively pushes new values from $C[0]$ and $C[1]$ to $H$.
+The implementation of \fn{read} and \fn{write-and-f} strongly resemble the f-array. \fn{write-and-f} uses a helper function \fn{update}. The intuition behind \fn{update} is that it ``pushes'' new values from $C[0]$ and $C[1]$ to $H$.
 We will show that it suffices to attempt to call \fn{update} twice to accomplish that.
 
 \begin{algorithmic}[1]
@@ -682,8 +681,8 @@ We will show that it suffices to attempt to call \fn{update} twice to accomplish
 	\Function{help}{x}
 		\State $l_c \gets C[side(x)].\fn{get-last}(child\_id(x))$ \label{get-last-recurse}
 		\State $v_{current} \gets H.\fn{get-current}().v$
-		\State binary search $\{v_{current}-(N+1),\ldots, v_{current}\}$ for first $v$ such that: \label{help-binsch}
-		\Statex $H.\fn{get}(v) \neq \none \textbf{ and } H.\fn{get}(v).v[side(x)] \geq l_c.v$ %indent!
+		\State \begin{varwidth}[t]{\linewidth} binary search $\{v_{current}-(N+1),\ldots, v_{current}\}$ for first $v$ such that: \label{help-binsch}\par
+		\hskip\algorithmicindent $H.\fn{get}(v) \neq \none \textbf{ and } H.\fn{get}(v).v[side(x)] \geq l_c.v$ \end{varwidth}
 		\If{no such $v$ exists}
 			\State \Return
 		\EndIf
