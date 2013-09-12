@@ -1,4 +1,5 @@
-\documentclass[a4paper,11pt]{article}
+%\documentclass[a4paper,11pt]{article}
+\documentclass{thesis}
 %\usepackage{algorithmicx}
 \usepackage{fancyvrb}
 \usepackage{fullpage}
@@ -37,7 +38,10 @@
 \newfloat{Listing}{t}{lop}
 \author{Robert Obryk}
 \title{Write-and-f-array: implementation and an application}
-\date{}
+\nralbumu{1040504}
+\kierunek{Computer Science - IT Analyst}
+\opiekun{dr Grzegorz Herman}
+\date{September 2013}
 \VerbatimFootnotes
 \begin{document}
 
@@ -57,7 +61,7 @@ The write-and-f-array can be applied to create a fetch-and-add object for $P$ pr
 \clearpage
 \tableofcontents
 \clearpage
-\section{Introduction}
+\chapter{Introduction}
 
 The advent of popular manycore systems has made concurrent programming for shared memory systems an important
 topic. With increasing parallelism available in a single shared-memory system, performance of techniques
@@ -69,7 +73,7 @@ data structure with an implementation that can be used concurrently and doesn't 
 an implementation of the fetch-and-add object (a kind of counter) with improved memory usage.
 
 
-\subsection{Concurrent Objects}
+\section{Concurrent Objects}
 A useful abstraction in a single-threaded system is an object: an entity with a set of methods one can invoke,
 and a specification of semantics of these methods. Naturally, a program can use multiple objects and invoke
 their methods in any order.
@@ -112,7 +116,7 @@ a single-threaded program (this will be our method of choice of providing object
 \Function{wr}{$y$}
 	\State $x \gets y$
 \EndFunction
-
+\pagebreak
 \Function{CAS}{$o, n$}
 \If{$x = o$}
 	\State $x \gets n$
@@ -176,7 +180,7 @@ at least one of the \fn{rd}() calls returns 1.
 \label{fig-ex-simple}
 \end{figure}
 
-\subsection{Serialization}
+\section{Serialization}
 In many situations it would be convenient to have more complicated concurrent objects: counters that can be incremented,
 queues that can be pushed to and popped from, etc. Alas, real-world hardware usually doesn't implement such objects
 directly. We will thus implement them using CAS registers or other simpler objects: we will substitute a set of simpler objects for every such object and for every method call on this object, execute a procedure that implements it instead.
@@ -253,7 +257,7 @@ We can also see that this implementation satisfies some global progress property
 another \fn{inc} must have suceeded very recently. In fact, it must have succeeded between the most recent execution
 of line~\ref{trivial-faa-rd} and the failed CAS. Still, a single \fn{inc} operation can fail to terminate.
 
-\subsection{Wait-freedom}
+\section{Wait-freedom}
 
 Consider an alternative implementation of an increment-only counter. In the following pseudocode, $P$ denotes
 the number of threads in the system.
@@ -294,7 +298,7 @@ of the number of threads.
 Thus, creating faster wait-free implementations of data structures is interesting, also from a practical
 point of view.
 
-\subsection{Snapshots}
+\section{Snapshots}
 
 The object implemented in this work is a generalization of a popular building block for multithreaded objects
 -- an atomic snapshot object\cite{snapshot-idea}. Its semantics can be defined by the following single-threaded pseudocode:
@@ -387,7 +391,7 @@ mutual exclusion, barrier synchronization\cite{faa-sync}, or work queues\cite{fa
 %In the second section of this paper we construct a helper structure, while in the third section we construct an implementation of the write-and-f-array. In the last section we describe possible extensions of this
 %structure and open problems.
 
-\section{The History Object}
+\chapter{The History Object}
 
 We will first implement a helper object -- the history object. Intuitively, it contains a versioned memory cell and allows retrieval of past $N$ values of the cell. The cell holds objects of type \T. The semantics of this object are precisely specified by the following single-threaded implementation:
 %\begin{Listing}[!h]
@@ -443,6 +447,7 @@ Our implementation is presented below:
 			\State $H[s.v \mod N].\fn{CAS}(h, l)$ \label{hist-help-cas}
 		\EndIf
 	\EndFunction
+	\pagebreak
 	\Function{get}{v}
 		\State $s \gets S.\fn{rd}()$ \label{hist-get-notyet-sp} \Comment{Possible serialization point}
 		\If{$s.v < v$}
@@ -553,7 +558,7 @@ Let us consider a calls to \fn{publish$_\cdot$}:
 
 Obviously all operations run in $O(1)$ time. Memory complexity is $O(N+P)$, where $N$ and $P$ are the parameters defined at the beginning of this section.
 We will now use this object in the main result of this work, an implementation of a write-and-$f$-array.
-\section{The Write-and-f-array}
+\chapter{The Write-and-f-array}
 
 We will now present our main result -- an implementation of a write-and-f-array.
 We will actually present a wait-free implementation of a slightly richer object -- the additional operations and return values are required for the recursive construction of the concurrent implementation.
@@ -861,7 +866,7 @@ We can construct a fetch-and-add object for $P$ threads by using a write-and-f-a
 a fetch-and-add object for $P$ threads with $O(\log^3 P)$ step complexity and $O(P\log P)$ memory complexity. Additionally, the object implements a method that retrieves the
 current value in $O(1)$ time.
 
-\section{Implementation}
+\chapter{Implementation}
 A fetch-and-add object was implemented using the above-mentioned construction from the write-and-f object. The implementation is written in C++ and uses the C++11 standard library support for atomic operations. It is published on Github \footnote{The version current as of the time this work is written is available at: \verb+https://github.com/robryk/parsum/tree/d3433f7f7b137b52a73cfb244d46081528c696c3+ }.
 
 Direct implementation of previously described algorithm would require CAS objects of size larger than the
@@ -906,7 +911,7 @@ of atomic reads, which are comparatively cheap on Intel processors.
 \label{fig-meas}
 \end{figure}
 
-\section{Extensions and Open Problems}
+\chapter{Extensions and Open Problems}
 
 Our implementation of write-and-f-array can be modified by splitting the work done by \fn{help} into $O(\log N)$ separate pieces (updates on consecutive levels of the tree) and running only a single such piece in \fn{update}.
 If we then enlarge the history size to $O(N\log N)$, Lemma~\ref{last-is-complete} still holds. This modification increases the memory complexity to $O(N\log^2N)$ and decreases the step complexity of
@@ -918,7 +923,7 @@ bounded version numbers, from a range of size $O(N)$. Unfortunately, popular arc
 The effect of the arity of the tree on the performance
 seems to be worth investigating.
 
-We pose two problems:
+We pose also two purely theoretical problems:
 
 \begin{itemize}
 	\item Our implementation of write-and-f-array is single-writer, so it is natural to consider the multi-writer write-and-f-array. Can we construct a multi-writer write-and-f-array in subquadratic memory with similar step complexities of the operations?
@@ -927,7 +932,7 @@ We pose two problems:
 \end{itemize}
 
 \begin{comment}
-\section{Conclusions}
+\chapter{Conclusions}
 The fetch-and-f-array was introduced and its wait-free implementation with polylogarithmic step complexities
 and near-linear memory complexity was provided. This in turn was used to produce a fetch-and-add counter
 with step complexity polylgarithmic in number of threads and memory complexity nearly linear in number
@@ -936,7 +941,7 @@ times slower than a trivial lock-free counter. A possible constant-factor improv
 not investigated. Some open problems were stated.
 \end{comment}
 
-\section{Acknowledgements}
+\begingroup\let\clearpage\relax\chapter{Acknowledgements}\endgroup
 The author would like to thank his advisor, dr. Grzegorz Herman for many fruitful discussions and help while preparing this paper. He would also like to thank Szymon Acedański for his help in improving the presentation of this paper.
 
 This work was supported by the Polish Ministry of Science and Higher Education program ``Diamentowy Grant''.
