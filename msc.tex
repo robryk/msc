@@ -57,6 +57,14 @@
 We provide a wait-free implementation of an $N$-element write-and-f-array with $O(N \log N)$ memory complexity, $O(\log^3 N)$ step complexity of the write-and-f operation and $O(1)$ step complexity of the read operation. The implementation uses CAS objects and requires their size to be $\Omega(\log M)$, where $M$ is the total number of write-and-f operations executed. We also show, how it can be modified to achieve $O(\log^2 N)$ step complexity of write-and-f, while increasing the memory complexity to $O(N \log^2 N)$.
 
 The write-and-f-array can be applied to create a fetch-and-add object for $P$ processes with $O(P \log P)$ memory complexity and $O(\log^3 P)$ step complexity of the fetch-and-add operation. This is the first implementation of fetch-and-add with polylogarithmic step complexity and subquadratic memory complexity that can be implemented without CAS or LL/SC objects of unrealistic size\cite{ellen-fai}.
+
+Keywords: concurrency, wait-free, snapshot, fetch-and-add
+
+\end{abstract}
+\begin{abstract}
+\input{summpl.txt}
+
+Słowa kluczowe: współbieżność, wait-free, snapshot, fetch-and-add
 \end{abstract}
 \clearpage
 \tableofcontents
