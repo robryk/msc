@@ -1,0 +1,14 @@
+Wprowadzamy nowy obiekt współbieżny: write-and-f-array, podajemy jego implementację wait-free i używamy jej aby skonstruować ulepszoną implementację wait-free obiektu fetch-and-add. Write-and-f-array uogólnia write-and-snapshot dla
+jednego pisarza w podobny sposób co f-array uogólnia snapshot. Dokładniej, write-and-f-array jest sparametryzowana przez łączny operator $f$ i koncepcyjnie jest tablicą z dwoma operacjami atomowymi:
+
+\begin{itemize}
+\item write-and-f, która modyfikuje jeden element tablicy i zwraca wynik aplikacji $f$ do wszystkich jej elementów,
+\item read, która zwraca wynik aplikacji $f$ do wszystkich elementów tablicy.
+\end{itemize}
+
+Podajemy implementację wait-free $N$-elementowej write-and-f-array ze złożonością pamięciową $O(N \log N)$, złożonością krokową write-and-f $O(\log^3 N)$ i stałą złożonością operacji read. Implementacja ta
+używa obiektów CAS o rozmiarze $\Omega(\log M)$, gdzie $M$ jest całkowitą liczbą wykonanych operacji write-and-f. Pokazujemy też modyfikację tej implementacji, która zmniejsza złożoność krokową write-and-f do $O(\log^2 N)$,
+jednocześnie zwiększając złożoność pamięciową do $O(N \log^2 N)$.
+
+Write-and-f-array znajduje zastosowanie w konstrukcji obiektu fetch-and-add dla $P$ procesorów ze złożonością pamięciową $O(P \log P)$ i złożonością krokową operacji $O(\log^3 P)$. Jest to pierwsza implementacja fetch-and-add
+z polilogarytmiczną złożonością krokową operacji i podkwadratową złożonością pamięciową, która nie wymaga obiektów CAS lub LL/SC o nierealistycznie dużym rozmiarze.
